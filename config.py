@@ -1,0 +1,2 @@
+NUM_NODES = 12
+KNOWN_IDS = [0, 2, 7]

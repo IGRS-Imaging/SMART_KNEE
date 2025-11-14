@@ -1,0 +1,31 @@
+name: landmark_completion
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pytorch=2.1.0
+  - pytorch-cuda=11.8
+  - torchvision=0.16.0
+  - torchaudio=2.1.0
+  - numpy=1.26.0
+  - scipy=1.11.3
+  - matplotlib=3.8.0
+  - pip=23.3.1
+  - jupyter=1.0.0
+  - ipykernel=6.25.2
+  - tqdm=4.66.1
+
+  - pip:
+      - torch-geometric==2.4.0
+      - torch-scatter==2.1.2
+      - torch-sparse==0.6.18
+      - torch-cluster==1.6.3
+      - torch-spline-conv==1.2.2
+      - egnn-pytorch==0.1.19
+      - tensorboard==2.15.1
+      - pytest==7.4.3
+      - pytest-cov==4.1.0
