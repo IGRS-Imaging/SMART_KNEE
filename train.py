@@ -1,11 +1,10 @@
 # train.py
-
 import torch
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 import config
-from data import LoadFemurDataset
+from data.dataset import LoadFemurDataset
 from models import LandmarkCompletionModel
 from losses import CompositeLoss
 
@@ -14,7 +13,7 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV)
+    dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV, augment=True)
     loader = DataLoader(dataset, batch_size=config.BATCH_SIZE, shuffle=True)
 
     model = LandmarkCompletionModel().to(device)
@@ -23,46 +22,32 @@ def train():
 
     for epoch in range(1, config.NUM_EPOCHS + 1):
         model.train()
-        total_loss = 0.0
+        total_loss = 0
 
-        progress = tqdm(loader, desc=f"Epoch {epoch}/{config.NUM_EPOCHS}", ncols=100)
-
-        for batch in progress:
+        pbar = tqdm(loader, desc=f"Epoch {epoch}/{config.NUM_EPOCHS}", ncols=120)
+        for batch in pbar:
             batch = batch.to(device)
 
-            # --- Model forward ---
-           # --- Model forward ---
-            pred_flat, pos_init_flat = model(batch)
+            pred, pos_init = model(batch)
 
             B = batch.num_graphs
             N = config.NUM_NODES
-
-            # reshape both outputs
-            pred = pred_flat.view(B, N, 3)
-            pos_init = pos_init_flat.view(B, N, 3)
-
-            # Correct ground-truth
+            pred = pred.view(B, N, 3)
             target = batch.pos.view(B, N, 3)
 
-            loss, info = criterion(pred, target)
-
+            known = batch.known_mask.view(B, N)
+            loss, info = criterion(pred, target, known)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item() * B
-            progress.set_postfix(
-                {"loss": f"{loss.item():.4f}", "L_align": f"{info['L_align']:.4f}", "L_shape": f"{info['L_shape']:.4f}"}
-            )
+            pbar.set_postfix({"loss": f"{loss.item():.3f}"})
 
-        avg_loss = total_loss / len(dataset)
-        print(f"Epoch {epoch}: avg loss = {avg_loss:.4f}")
+        print(f"Epoch {epoch}: Avg Loss = {total_loss/len(dataset):.4f}")
 
-        # Save best so far (simple version: overwrite)
         torch.save(model.state_dict(), config.CHECKPOINT_PATH)
-
-    print("Training finished. Saved model to", config.CHECKPOINT_PATH)
 
 
 if __name__ == "__main__":

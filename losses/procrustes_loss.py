@@ -1,42 +1,19 @@
 # losses/procrustes_loss.py
-
 import torch
 
 
-def procrustes_align(pred, gt):
-    """
-    Differentiable Procrustes alignment.
-    pred: (B, N, 3)
-    gt:   (B, N, 3)
-
-    Returns:
-        pred_aligned: (B, N, 3)
-        R: (B, 3, 3)
-        t: (B, 1, 3)
-    """
+def procrustes_align(pred, target):
     B, N, _ = pred.shape
 
-    mu_pred = pred.mean(dim=1, keepdim=True)
-    mu_gt = gt.mean(dim=1, keepdim=True)
+    pred_c = pred - pred.mean(dim=1, keepdim=True)
+    target_c = target - target.mean(dim=1, keepdim=True)
 
-    pred_c = pred - mu_pred
-    gt_c = gt - mu_gt
+    H = torch.matmul(pred_c.transpose(1, 2), target_c)
+    U, S, Vt = torch.linalg.svd(H)
 
-    C = torch.matmul(gt_c.transpose(1, 2), pred_c) / N  # (B,3,3)
+    R = torch.matmul(Vt.transpose(1, 2), U.transpose(1, 2))
 
-    U, S, Vt = torch.linalg.svd(C, full_matrices=False)
+    pred_aligned = torch.matmul(pred_c, R)
+    pred_aligned += target.mean(dim=1, keepdim=True)
 
-    # initial rotation
-    R = torch.matmul(U, Vt)
-
-    # Fix reflections: det(R) should be +1
-    det_R = torch.det(R)  # (B,)
-    D = torch.ones((B, 3, 3), device=pred.device)
-    D[:, 2, 2] = torch.sign(det_R)
-    R = torch.matmul(torch.matmul(U, D), Vt)
-
-    t = mu_gt - torch.matmul(mu_pred, R)  # (B,1,3)
-
-    pred_aligned = torch.matmul(pred, R) + t
-
-    return pred_aligned, R, t
+    return pred_aligned, R, S
