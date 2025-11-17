@@ -1,10 +1,10 @@
 # test.py
-
 import torch
+import matplotlib.pyplot as plt
 from torch_geometric.loader import DataLoader
 
 import config
-from data import LoadFemurDataset
+from data.dataset import LoadFemurDataset
 from models import LandmarkCompletionModel
 from losses import procrustes_align
 from utils.visualization import visualize_shapes
@@ -14,75 +14,57 @@ def test():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Testing on device:", device)
 
-    # ----------------------------
-    # Load dataset
-    # ----------------------------
-    dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV)
-    loader = DataLoader(dataset, batch_size=config.BATCH_SIZE, shuffle=False)
+    dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV, augment=False)
+    loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    # ----------------------------
-    # Load model
-    # ----------------------------
     model = LandmarkCompletionModel().to(device)
     model.load_state_dict(torch.load(config.TEST_MODEL_PATH, map_location=device))
     model.eval()
 
-    all_errors = []
+    errors = []
 
-    # ----------------------------
-    # Inference loop
-    # ----------------------------
     with torch.no_grad():
-        for batch_idx, batch in enumerate(loader):
-
+        for idx, batch in enumerate(loader):
             batch = batch.to(device)
 
-            # Model outputs: pred_flat, pos_init_flat
-            pred_flat, pos_init_flat = model(batch)
+            pred, pos_init = model(batch)
 
-            B = batch.num_graphs
-            N = config.NUM_NODES
+            pred = pred.view(1, config.NUM_NODES, 3)
+            target = batch.pos.view(1, config.NUM_NODES, 3)
 
-            pred = pred_flat.view(B, N, 3)
-            pos_init = pos_init_flat.view(B, N, 3)
-            target = batch.pos.view(B, N, 3)
+            # reshape known mask
+            known = batch.known_mask.view(1, config.NUM_NODES)
 
-            # ----------------------------
-            # Error after Procrustes alignment
-            # ----------------------------
-            pred_aligned, _, _ = procrustes_align(pred, target)
-            error = (pred_aligned - target).norm(dim=-1).mean(dim=-1)  # (B,)
-            all_errors.append(error.cpu())
+            # Procrustes alignment
+            pred_a, _, _ = procrustes_align(pred, target)
 
-            # ----------------------------
-            # Visualize only the FIRST sample of FIRST batch
-            # ----------------------------
-            if batch_idx == 0:
-                graph_mask = batch.batch == 0       # boolean mask for graph 0
-                node_ids = graph_mask.nonzero(as_tuple=True)[0]
-                
-                # Extract nodes belonging to first graph
-                pos_gt_single = target[0]
-                pos_init_single = pos_init[0]
-                pos_pred_single = pred[0]
-                
-                # Extract edges belonging to first graph
-                E0_mask = (batch.edge_index[0] < N) & (batch.edge_index[1] < N)
-                edge_index_single = batch.edge_index[:, E0_mask]
+            # Only unknown nodes contribute to error
+            unknown = (~known).float().unsqueeze(-1)
+            err = ((pred_a - target) * unknown).norm(dim=-1).mean()
+            errors.append(err.item())
 
+            # visualize the first sample
+            if idx == 0:
                 visualize_shapes(
-                    pos_gt=pos_gt_single.cpu(),
-                    pos_init=pos_init_single.cpu(),
-                    pos_pred=pos_pred_single.cpu(),
-                    edge_index=edge_index_single.cpu(),
-                    title="Example 0: Initialization vs Prediction",
+                    pos_gt=target[0].cpu(),
+                    pos_init=pos_init.view(config.NUM_NODES, 3).cpu(),
+                    pos_pred=pred.view(config.NUM_NODES, 3).cpu(),
+                    edge_index=batch.edge_index.cpu(),
+                    title=f"Prediction (Sample {idx})"
                 )
 
-    # ----------------------------
-    # Final P-MPJPE
-    # ----------------------------
-    all_errors = torch.cat(all_errors)
-    print(f"\nMean P-MPJPE: {all_errors.mean().item():.4f} mm")
+    # ---------- PLOT P-MPJPE ----------
+    plt.figure(figsize=(8, 5))
+    plt.plot(errors, marker='o', linewidth=2)
+    plt.title("P-MPJPE per Test Sample", fontsize=16)
+    plt.xlabel("Sample Index", fontsize=14)
+    plt.ylabel("P-MPJPE (mm)", fontsize=14)
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+    # -----------------------------------
+
+    print(f"\nMean P-MPJPE: {sum(errors)/len(errors):.3f} mm")
 
 
 if __name__ == "__main__":
