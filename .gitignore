@@ -1,3 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.pickle
+
+# Environments
+.env
+.venv/
+venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# PyTorch model files
+*.pt
+*.pth
+*.ckpt
+
+# Logs
+logs/
+wandb/
+*.log
+
+# Data / Large files
+data/raw/
+data/tmp/
+datasets/
+*.h5
+*.npz
+
+# MacOS
+.DS_Store
+
+# VSCode
+.vscode/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# TensorBoard
+runs/
+
+# React / Node (if frontend included)
+node_modules/
+
 /test_jupyter_notebooks
 environment-cpu.yml
-
+checkpoints/
