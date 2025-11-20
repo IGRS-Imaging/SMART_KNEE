@@ -7,13 +7,13 @@ import os
 import config
 from data.dataset import LoadFemurDataset
 from models import LandmarkCompletionModel
-from losses import CompositeLoss
+# Ensure this matches the filename where you saved the new class
+from losses import CompositeLoss1
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    # Ensure checkpoint directory exists
     os.makedirs(os.path.dirname(config.CHECKPOINT_PATH), exist_ok=True)
 
     dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV, augment=False)
@@ -21,46 +21,43 @@ def train():
 
     model = LandmarkCompletionModel().to(device)
     
-    # Initialize loss with weights from config
-    criterion = CompositeLoss(
-        w_align=config.W_ALIGN, 
-        w_shape=config.W_SHAPE, 
+    # --- FIX: Initialize with the NEW arguments matching the Class Definition ---
+    criterion = CompositeLoss1(
+        w_proc=config.W_PROC, 
+        w_icp=config.W_ICP, 
+        w_tps=config.W_TPS, 
         w_edge=config.W_EDGE
     ).to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LR)
-
     best_loss = float('inf')
 
     for epoch in range(1, config.NUM_EPOCHS + 1):
         model.train()
         total_loss = 0
         
-        # Logging dict for loss components
-        loss_log = {"align": 0.0, "shape": 0.0, "edge": 0.0}
+        # --- FIX: Update Log dictionary to track new losses ---
+        loss_log = {"proc": 0.0, "icp": 0.0, "tps": 0.0, "edge": 0.0}
 
         pbar = tqdm(loader, desc=f"Epoch {epoch}/{config.NUM_EPOCHS}", ncols=120)
         for batch in pbar:
             batch = batch.to(device)
 
-            # Forward pass (returns predicted pos and initialized pos)
             pred, pos_init = model(batch)
 
             B = batch.num_graphs
             N = config.NUM_NODES
             
-            # Reshape for loss calculation (B, N, 3)
             pred_reshaped = pred.view(B, N, 3)
             target_reshaped = batch.pos.view(B, N, 3)
             known_reshaped = batch.known_mask.view(B, N)
 
-            # Calculate Loss
             loss, info = criterion(
                 pred=pred_reshaped, 
                 target=target_reshaped, 
                 known_mask=known_reshaped,
-                edge_index=batch.edge_index,  # Pass edge topology
-                edge_attr_gt=batch.edge_attr  # Pass ground truth edge lengths
+                edge_index=batch.edge_index,
+                edge_attr_gt=batch.edge_attr
             )
 
             optimizer.zero_grad()
@@ -69,20 +66,23 @@ def train():
 
             total_loss += loss.item() * B
             
-            # Update logs
-            loss_log["align"] += info["L_align"] * B
-            loss_log["shape"] += info["L_shape"] * B
+            # --- FIX: Log the new keys ---
+            loss_log["proc"] += info["L_proc"] * B
+            loss_log["icp"]  += info["L_icp"] * B
+            loss_log["tps"]  += info["L_tps"] * B
             loss_log["edge"] += info["L_edge"] * B
 
             pbar.set_postfix({"loss": f"{loss.item():.3f}"})
 
         avg_loss = total_loss / len(dataset)
+        
+        # --- FIX: Update Print Statement ---
         print(f"Epoch {epoch}: Avg Loss = {avg_loss:.4f} "
-              f"[Align: {loss_log['align']/len(dataset):.3f}, "
-              f"Shape: {loss_log['shape']/len(dataset):.3f}, "
+              f"[Proc: {loss_log['proc']/len(dataset):.3f}, "
+              f"ICP: {loss_log['icp']/len(dataset):.3f}, "
+              f"TPS: {loss_log['tps']/len(dataset):.3f}, "
               f"Edge: {loss_log['edge']/len(dataset):.3f}]")
 
-        # Simple checkpointing
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), config.CHECKPOINT_PATH)
