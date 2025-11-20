@@ -1,82 +1,130 @@
 # utils/visualization.py
 
 import torch
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+import plotly.graph_objects as go
 
+def _to_np(tensor_or_array):
+    if torch.is_tensor(tensor_or_array):
+        return tensor_or_array.detach().cpu().numpy()
+    return np.array(tensor_or_array)
+
+def _generate_edge_lists(pos, edge_index):
+    x_lines, y_lines, z_lines = [], [], []
+    if edge_index.shape[0] == 2 and edge_index.shape[1] > 2:
+         edge_iter = edge_index.T
+    else:
+         edge_iter = edge_index
+
+    for u, v in edge_iter:
+        u, v = int(u), int(v)
+        x_lines.extend([pos[u, 0], pos[v, 0], None])
+        y_lines.extend([pos[u, 1], pos[v, 1], None])
+        z_lines.extend([pos[u, 2], pos[v, 2], None])
+    return x_lines, y_lines, z_lines
+
+def _generate_hover_text(pos, label):
+    hover_text = []
+    for i in range(len(pos)):
+        x, y, z = pos[i]
+        txt = f"<b>Node: {i}</b><br>{label}<br>X: {x:.2f}<br>Y: {y:.2f}<br>Z: {z:.2f}"
+        hover_text.append(txt)
+    return hover_text
 
 def visualize_shapes(pos_gt, pos_init, pos_pred, edge_index, title="Shape Visualization"):
-    """
-    pos_gt:   (N,3) ground truth coords
-    pos_init: (N,3) initialized coords (centroid init)
-    pos_pred: (N,3) predicted coords from EGNN
-    edge_index: (2,E) graph structure
-    """
+    # 1. Data Prep
+    pos_gt_np = _to_np(pos_gt)
+    pos_pred_np = _to_np(pos_pred)
+    pos_init_np = _to_np(pos_init) if pos_init is not None else None
+    edge_index_np = _to_np(edge_index)
+    
+    num_nodes = pos_gt_np.shape[0]
+    node_labels = [str(i) for i in range(num_nodes)] # ["0", "1", "2", ...]
+    
+    fig = go.Figure()
 
-    fig = plt.figure(figsize=(12, 6))
+    # =========================================
+    # 1. Ground Truth (Green)
+    # =========================================
+    fig.add_trace(go.Scatter3d(
+        x=pos_gt_np[:, 0], y=pos_gt_np[:, 1], z=pos_gt_np[:, 2],
+        mode='markers+text',
+        marker=dict(size=6, color='green', opacity=0.8),
+        text=node_labels, 
+        textposition="top center", # GT labels on TOP
+        textfont=dict(size=10, color='green'),
+        name='GT Nodes',
+        hoverinfo="text",
+        hovertext=_generate_hover_text(pos_gt_np, "Ground Truth")
+    ))
 
-    # ---------------------------
-    # 1) 3D Ground Truth
-    # ---------------------------
-    ax1 = fig.add_subplot(131, projection="3d")
-    ax1.set_title("Ground Truth")
-    ax1.scatter(pos_gt[:, 0], pos_gt[:, 1], pos_gt[:, 2], c="green", s=40, label="GT")
+    # GT Edges
+    gt_x, gt_y, gt_z = _generate_edge_lists(pos_gt_np, edge_index_np)
+    fig.add_trace(go.Scatter3d(
+        x=gt_x, y=gt_y, z=gt_z,
+        mode='lines',
+        line=dict(color='green', width=2, dash='dot'),
+        opacity=0.5,
+        name='GT Edges',
+        hoverinfo='none'
+    ))
 
-    # draw edges
-    for u, v in edge_index.t().tolist():
-        ax1.plot(
-            [pos_gt[u, 0], pos_gt[v, 0]],
-            [pos_gt[u, 1], pos_gt[v, 1]],
-            [pos_gt[u, 2], pos_gt[v, 2]],
-            c="gray",
-            linewidth=1
-        )
+    # =========================================
+    # 2. Prediction (Blue)
+    # =========================================
+    # Pred Nodes - NOW WITH TEXT
+    fig.add_trace(go.Scatter3d(
+        x=pos_pred_np[:, 0], y=pos_pred_np[:, 1], z=pos_pred_np[:, 2],
+        mode='markers+text', # Changed from 'markers' to 'markers+text'
+        marker=dict(size=7, color='blue', symbol='diamond', opacity=1.0),
+        text=node_labels,
+        textposition="bottom center", # Pred labels on BOTTOM (to avoid overlap)
+        textfont=dict(size=10, color='blue'),
+        name='Pred Nodes',
+        hoverinfo="text",
+        hovertext=_generate_hover_text(pos_pred_np, "Prediction")
+    ))
 
-    ax1.legend()
+    # Pred Edges
+    pred_x, pred_y, pred_z = _generate_edge_lists(pos_pred_np, edge_index_np)
+    fig.add_trace(go.Scatter3d(
+        x=pred_x, y=pred_y, z=pred_z,
+        mode='lines',
+        line=dict(color='blue', width=3),
+        opacity=0.8,
+        name='Pred Edges',
+        hoverinfo='none'
+    ))
+    
+    # =========================================
+    # 3. Initialization (Orange)
+    # =========================================
+    if pos_init_np is not None:
+        fig.add_trace(go.Scatter3d(
+            x=pos_init_np[:, 0], y=pos_init_np[:, 1], z=pos_init_np[:, 2],
+            mode='markers',
+            marker=dict(size=5, color='orange', opacity=0.6),
+            name='Init Nodes',
+            hoverinfo="text",
+            hovertext=_generate_hover_text(pos_init_np, "Initialization"),
+            visible='legendonly' 
+        ))
 
-    # ---------------------------
-    # 2) Initialization (centroid-based)
-    # ---------------------------
-    ax2 = fig.add_subplot(132, projection="3d")
-    ax2.set_title("Initialization (centroid init)")
+    # =========================================
+    # Layout
+    # =========================================
+    fig.update_layout(
+        title=title,
+        width=1200,
+        height=800,
+        scene=dict(
+            aspectmode='data', 
+            xaxis_title='X (mm)',
+            yaxis_title='Y (mm)',
+            zaxis_title='Z (mm)',
+            bgcolor='white'
+        ),
+        legend=dict(x=0.7, y=0.9, bgcolor='rgba(255,255,255,0.8)')
+    )
 
-    ax2.scatter(pos_init[:, 0], pos_init[:, 1], pos_init[:, 2],
-                c="orange", s=40, label="Init")
-
-    for u, v in edge_index.t().tolist():
-        ax2.plot(
-            [pos_init[u, 0], pos_init[v, 0]],
-            [pos_init[u, 1], pos_init[v, 1]],
-            [pos_init[u, 2], pos_init[v, 2]],
-            c="gray",
-            linewidth=1
-        )
-
-    ax2.legend()
-
-    # ---------------------------
-    # 3) Predicted Shape
-    # ---------------------------
-    ax3 = fig.add_subplot(133, projection="3d")
-    ax3.set_title("Prediction")
-
-    ax3.scatter(pos_pred[:, 0], pos_pred[:, 1], pos_pred[:, 2],
-                c="blue", s=40, label="Pred")
-
-    for u, v in edge_index.t().tolist():
-        ax3.plot(
-            [pos_pred[u, 0], pos_pred[v, 0]],
-            [pos_pred[u, 1], pos_pred[v, 1]],
-            [pos_pred[u, 2], pos_pred[v, 2]],
-            c="gray",
-            linewidth=1
-        )
-
-    ax3.legend()
-
-    # ---------------------------
-    # Global layout
-    # ---------------------------
-    fig.suptitle(title, fontsize=16)
-    plt.tight_layout()
-    plt.show()
+    fig.show()
