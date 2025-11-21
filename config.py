@@ -17,10 +17,11 @@ NUM_EPOCHS = 200
 # Loss Weights
 W_ALIGN = 1.0     # Procrustes alignment weight
 W_SHAPE = 0.1     # Pairwise shape consistency weight
-W_EDGE  = 0.5     # Edge length constraint weight
-W_PROC = 1.0      # Rigid Alignment weight
+W_PROC = 0.2      # Rigid Alignment weight
 W_ICP  = 0.5      # Chamfer/Nearest Neighbor weight
 W_TPS  = 1.0      # Non-rigid warping weight
+W_POS = 1.0      # Main position MSE
+W_EDGE = 1.0     # Edge consistency
 
 # Paths
 CHECKPOINT_PATH = "./checkpoints/best_model.pt"

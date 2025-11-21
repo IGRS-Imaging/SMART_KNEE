@@ -1,58 +1,50 @@
+# losses/composite_loss.py
 import torch
 import torch.nn as nn
-from .procrustes_loss import procrustes_align
 
 class CompositeLoss(nn.Module):
-    def __init__(self, w_align=1.0, w_shape=0.1, w_edge=0.5):
+    def __init__(self, w_pos=1.0, w_edge=0.5):
         super().__init__()
-        self.mse = nn.MSELoss()
+        self.mse = nn.MSELoss(reduction='none')
         self.l1 = nn.L1Loss()
         
-        self.w_align = w_align
-        self.w_shape = w_shape
-        self.w_edge = w_edge  # Weight for the edge constraint
+        self.w_pos = w_pos
+        self.w_edge = w_edge 
 
     def forward(self, pred, target, known_mask, edge_index, edge_attr_gt):
         """
-        pred: (B, N, 3)
-        target: (B, N, 3)
-        edge_index: (2, E_total)
-        edge_attr_gt: (E_total, 1)
+        pred: (B, N, 3) - Already rigidly anchored by the model
+        target: (B, N, 3) - Absolute Ground Truth
         """
         B, N, _ = pred.shape
-        unknown = (~known_mask).float().unsqueeze(-1)
-
-        # 1. Alignment Loss (Procrustes)
-        pred_aligned, _, _ = procrustes_align(pred, target)
         
-        # Calculate error only on unknown nodes? Or all?
-        # Usually better to supervise all to keep structure, but heavily weight unknown
-        L_align = self.mse(pred_aligned * unknown, target * unknown)
+        # 1. Position Loss (Direct MSE)
+        # We calculate MSE on ALL nodes.
+        # Since the model anchors the known nodes internally, 
+        # the loss on known nodes should naturally go to near-zero.
+        # The loss on unknown nodes drives the learning of the shape.
+        pos_loss_per_node = self.mse(pred, target).sum(dim=-1) # (B, N)
+        
+        # You can optionally weight unknown nodes higher if needed, 
+        # but standard MSE is usually sufficient with hard anchoring.
+        L_pos = pos_loss_per_node.mean()
 
-        # 2. Global Shape Loss (Pairwise distances matrix)
-        # Downsamples if N is large, but for 12 nodes this is fine
-        pd = torch.cdist(pred, pred)
-        td = torch.cdist(target, target)
-        L_shape = self.l1(pd, td)
-
-        # 3. Edge Consistency Loss (Explicit Constraint)
-        # We must extract edges from the batch-wise prediction
-        # Reshape pred to (B*N, 3) to use with edge_index
+        # 2. Edge Consistency Loss
+        # Enforces physical structure (bone length consistency)
         pred_flat = pred.view(-1, 3)
-        
         row, col = edge_index
-        pred_edge_vec = pred_flat[row] - pred_flat[col]
-        pred_edge_dist = pred_edge_vec.norm(dim=-1, keepdim=True) # (E, 1)
         
-        # Compare predicted edge lengths to Ground Truth edge lengths from CSV
-        L_edge = self.mse(pred_edge_dist, edge_attr_gt)
+        pred_vec = pred_flat[row] - pred_flat[col]
+        pred_dist = pred_vec.norm(dim=-1, keepdim=True) # (E, 1)
+        
+        # Compare predicted edge lengths to Ground Truth edge lengths
+        L_edge = nn.MSELoss()(pred_dist, edge_attr_gt)
 
-        total_loss = (self.w_align * L_align) + \
-                     (self.w_shape * L_shape) + \
-                     (self.w_edge * L_edge)
+        # Total Loss
+        total_loss = (self.w_pos * L_pos) + (self.w_edge * L_edge)
 
         return total_loss, {
-            "L_align": L_align.item(), 
-            "L_shape": L_shape.item(),
-            "L_edge": L_edge.item()
+            "L_pos": L_pos.item(), 
+            "L_edge": L_edge.item(),
+            "L_align": 0.0 # Deprecated placeholder
         }
