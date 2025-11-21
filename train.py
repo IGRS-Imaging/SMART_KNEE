@@ -7,26 +7,19 @@ import os
 import config
 from data.dataset import LoadFemurDataset
 from models import LandmarkCompletionModel
-from losses import CompositeLoss
+from losses import CompositeLoss # Now assumes the updated one
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Using device:", device)
-
-    # Ensure checkpoint directory exists
-    os.makedirs(os.path.dirname(config.CHECKPOINT_PATH), exist_ok=True)
-
-    dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV, augment=False)
+    
+    # Initialize Dataset
+    dataset = LoadFemurDataset(config.LANDMARKS_CSV, config.EDGES_CSV, augment=True)
     loader = DataLoader(dataset, batch_size=config.BATCH_SIZE, shuffle=True)
 
     model = LandmarkCompletionModel().to(device)
     
-    # Initialize loss with weights from config
-    criterion = CompositeLoss(
-        w_align=config.W_ALIGN, 
-        w_shape=config.W_SHAPE, 
-        w_edge=config.W_EDGE
-    ).to(device)
+    # NEW: Use simpler weights
+    criterion = CompositeLoss(w_pos=config.W_POS, w_edge=config.W_EDGE).to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LR)
 
@@ -35,58 +28,54 @@ def train():
     for epoch in range(1, config.NUM_EPOCHS + 1):
         model.train()
         total_loss = 0
-        
-        # Logging dict for loss components
-        loss_log = {"align": 0.0, "shape": 0.0, "edge": 0.0}
+        loss_log = {"pos": 0.0, "edge": 0.0}
 
-        pbar = tqdm(loader, desc=f"Epoch {epoch}/{config.NUM_EPOCHS}", ncols=120)
+        pbar = tqdm(loader, desc=f"Epoch {epoch}", ncols=100)
         for batch in pbar:
             batch = batch.to(device)
 
-            # Forward pass (returns predicted pos and initialized pos)
-            pred, pos_init = model(batch)
+            # Forward pass (now returns rigid-anchored predictions)
+            pred, _ = model(batch)
 
             B = batch.num_graphs
             N = config.NUM_NODES
             
-            # Reshape for loss calculation (B, N, 3)
             pred_reshaped = pred.view(B, N, 3)
             target_reshaped = batch.pos.view(B, N, 3)
             known_reshaped = batch.known_mask.view(B, N)
 
-            # Calculate Loss
+            # Calculate Loss (Direct MSE vs GT)
             loss, info = criterion(
                 pred=pred_reshaped, 
                 target=target_reshaped, 
                 known_mask=known_reshaped,
-                edge_index=batch.edge_index,  # Pass edge topology
-                edge_attr_gt=batch.edge_attr  # Pass ground truth edge lengths
+                edge_index=batch.edge_index,
+                edge_attr_gt=batch.edge_attr
             )
 
             optimizer.zero_grad()
             loss.backward()
+            
+            # Gradient clipping helps stabilize EGNN coords
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            
             optimizer.step()
 
             total_loss += loss.item() * B
-            
-            # Update logs
-            loss_log["align"] += info["L_align"] * B
-            loss_log["shape"] += info["L_shape"] * B
+            loss_log["pos"] += info["L_pos"] * B
             loss_log["edge"] += info["L_edge"] * B
 
-            pbar.set_postfix({"loss": f"{loss.item():.3f}"})
+            pbar.set_postfix({"L_pos": f"{info['L_pos']:.2f}"})
 
         avg_loss = total_loss / len(dataset)
-        print(f"Epoch {epoch}: Avg Loss = {avg_loss:.4f} "
-              f"[Align: {loss_log['align']/len(dataset):.3f}, "
-              f"Shape: {loss_log['shape']/len(dataset):.3f}, "
-              f"Edge: {loss_log['edge']/len(dataset):.3f}]")
+        avg_pos = loss_log['pos'] / len(dataset)
+        avg_edge = loss_log['edge'] / len(dataset)
+        
+        print(f"Ep {epoch}: Avg {avg_loss:.4f} [Pos: {avg_pos:.4f}, Edge: {avg_edge:.4f}]")
 
-        # Simple checkpointing
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), config.CHECKPOINT_PATH)
-            print(">>> New best model saved.")
 
 if __name__ == "__main__":
     train()
