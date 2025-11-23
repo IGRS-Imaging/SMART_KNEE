@@ -1,31 +1,33 @@
-# Data
+import os
+
+# Get the absolute path of the directory where config.py 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# Data Settings
 NUM_NODES = 12
-# Example indices: hip centre, medial epicondyle, lateral proximal condyle
-KNOWN_IDS = [0, 2, 7]   
+KNOWN_IDS = [0, 2, 7, 9]   
 
 # Model Architecture
 FEAT_DIM = 128
 HIDDEN_DIM = 128
-GNN_LAYERS = 4
-EDGE_DIM = 1      # Changed from 0 to 1 (Euclidean distance is the feature)
+GNN_LAYERS = 5
+EDGE_DIM = 1      
 
-# Training Hyperparameters
+# Training
 BATCH_SIZE = 8
-LR = 1e-3
+LR = 1e-4
 NUM_EPOCHS = 200
 
-# Loss Weights
-W_ALIGN = 1.0     # Procrustes alignment weight
-W_SHAPE = 0.1     # Pairwise shape consistency weight
-W_PROC = 0.2      # Rigid Alignment weight
-W_ICP  = 0.5      # Chamfer/Nearest Neighbor weight
-W_TPS  = 1.0      # Non-rigid warping weight
-W_POS = 1.0      # Main position MSE
-W_EDGE = 1.0     # Edge consistency
+# Normalization & Template
+GLOBAL_SCALE = 500.0 
 
-# Paths
-CHECKPOINT_PATH = "./checkpoints/best_model.pt"
+MEAN_SHAPE_PATH = os.path.join(PROJECT_ROOT, "data", "mean_canonical_shape.npy") 
+LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "Femur_Landmarks.csv")
+EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "Edges.csv")
+CHECKPOINT_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "best_model.pt")
 TEST_MODEL_PATH = CHECKPOINT_PATH
+LOG_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "training_log.csv") 
 
-LANDMARKS_CSV = "./data/Femur_Landmarks.csv"
-EDGES_CSV = "./data/Edges.csv"
+# Loss Weights
+W_POS = 10.0      
+W_EDGE = 2.0
