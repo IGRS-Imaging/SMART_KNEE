@@ -1,13 +1,29 @@
-# train.py
 import torch
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 import os
+import csv # New import
 
 import config
 from data.dataset import LoadFemurDataset
 from models import LandmarkCompletionModel
-from losses import CompositeLoss # Now assumes the updated one
+from losses import CompositeLoss
+
+def log_to_csv(epoch, avg_loss, avg_pos, avg_edge, log_path):
+    file_exists = os.path.isfile(log_path)
+    with open(log_path, 'a', newline='') as csvfile:
+        fieldnames = ['epoch', 'avg_loss', 'avg_pos', 'avg_edge']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        if not file_exists:
+            writer.writeheader()
+        
+        writer.writerow({
+            'epoch': epoch, 
+            'avg_loss': avg_loss, 
+            'avg_pos': avg_pos, 
+            'avg_edge': avg_edge
+        })
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,12 +34,17 @@ def train():
 
     model = LandmarkCompletionModel().to(device)
     
-    # NEW: Use simpler weights
     criterion = CompositeLoss(w_pos=config.W_POS, w_edge=config.W_EDGE).to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LR)
 
     best_loss = float('inf')
+    
+    # Clear previous log file
+    if os.path.exists(config.LOG_PATH):
+        os.remove(config.LOG_PATH)
+        print(f"Cleared previous log file at {config.LOG_PATH}")
+
 
     for epoch in range(1, config.NUM_EPOCHS + 1):
         model.train()
@@ -34,7 +55,6 @@ def train():
         for batch in pbar:
             batch = batch.to(device)
 
-            # Forward pass (now returns rigid-anchored predictions)
             pred, _ = model(batch)
 
             B = batch.num_graphs
@@ -44,7 +64,6 @@ def train():
             target_reshaped = batch.pos.view(B, N, 3)
             known_reshaped = batch.known_mask.view(B, N)
 
-            # Calculate Loss (Direct MSE vs GT)
             loss, info = criterion(
                 pred=pred_reshaped, 
                 target=target_reshaped, 
@@ -72,9 +91,14 @@ def train():
         avg_edge = loss_log['edge'] / len(dataset)
         
         print(f"Ep {epoch}: Avg {avg_loss:.4f} [Pos: {avg_pos:.4f}, Edge: {avg_edge:.4f}]")
+        
+        # Log training progress
+        log_to_csv(epoch, avg_loss, avg_pos, avg_edge, config.LOG_PATH)
 
         if avg_loss < best_loss:
             best_loss = avg_loss
+            # Ensure directory exists before saving
+            os.makedirs(os.path.dirname(config.CHECKPOINT_PATH), exist_ok=True)
             torch.save(model.state_dict(), config.CHECKPOINT_PATH)
 
 if __name__ == "__main__":
