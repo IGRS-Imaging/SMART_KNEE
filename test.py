@@ -57,7 +57,7 @@ def test():
             errors.append(err.item())
 
             # 3. Visualization (idx == 150 or any specific index)
-            if idx == 222:
+            if idx == 0:
                 print(f"Visualizing Sample {idx} | Subject: {current_subject} | Error: {err.item():.3f} mm")
                 
                 # Visualize the OUTPUT of the model directly (pred_mm) 

@@ -23,8 +23,8 @@ class LoadFemurDataset(Dataset):
         super().__init__()
         self.landmarks_df = pd.read_csv(landmarks_csv_path, skiprows=[1])
         self.edges_df = pd.read_csv(edges_csv_path)
+        self.augment = augment
         
-        # Create edge index (0-based)
         edge_idx = self.edges_df[["V1", "V2"]].values - 1
         self.edge_index = torch.tensor(edge_idx.T, dtype=torch.long)
 
@@ -34,31 +34,36 @@ class LoadFemurDataset(Dataset):
     def __getitem__(self, idx):
         row = self.landmarks_df.iloc[idx]
         subject = row["Source"]
-
-        # 1. Get Positions
         coords = extract_coords(row)
-        
-        # 2. Get Edge Attributes (Target Distances)
-        # Assumes edges_df has columns named by Subject ID containing distances
-        # Shape: (Num_Edges, 1)
+        pos = torch.tensor(coords, dtype=torch.float32)
+        side = get_chirality(subject)
+
+        # FIX: Symmetric Augmentation to balance Left/Right errors
+        if self.augment:
+            # 1. Random Flip (Left <-> Right)
+            if torch.rand(1) > 0.5:
+                pos[:, 0] = -pos[:, 0] 
+                side = 1 - side 
+            
+            # 2. Random Rotation (Z-axis)
+            theta = torch.rand(1) * 2 * np.pi
+            c, s = torch.cos(theta), torch.sin(theta)
+            R = torch.tensor([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=torch.float32)
+            pos = torch.matmul(pos, R)
+
         if subject in self.edges_df.columns:
             dists = self.edges_df[subject].values.astype(float)
         else:
-            # Fallback if subject not found (should ensure data integrity)
             dists = np.zeros(self.edge_index.size(1))
-            
+        
         edge_attr = torch.tensor(dists, dtype=torch.float32).unsqueeze(-1)
-
-        known_mask = torch.tensor(get_known_mask(), dtype=torch.bool)
-        side = torch.tensor(get_chirality(subject), dtype=torch.long)
-
-
+        
         data = Data(
-            pos=torch.tensor(coords, dtype=torch.float32),
+            pos=pos,
             edge_index=self.edge_index.clone(),
             edge_attr=edge_attr, 
-            known_mask=known_mask,
-            side=side,
+            known_mask=torch.tensor(get_known_mask(), dtype=torch.bool),
+            side=torch.tensor(side, dtype=torch.long),
             subject=str(subject),
             num_nodes=config.NUM_NODES
         )
