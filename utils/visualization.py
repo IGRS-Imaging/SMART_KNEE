@@ -1,5 +1,3 @@
-# utils/visualization.py
-
 import torch
 import numpy as np
 import plotly.graph_objects as go
@@ -23,66 +21,92 @@ def _generate_edge_lists(pos, edge_index):
         z_lines.extend([pos[u, 2], pos[v, 2], None])
     return x_lines, y_lines, z_lines
 
-def _generate_hover_text(pos, label):
+def _generate_hover_text(pos, label, errors=None):
     hover_text = []
     for i in range(len(pos)):
         x, y, z = pos[i]
-        txt = f"<b>Node: {i}</b><br>{label}<br>X: {x:.2f}<br>Y: {y:.2f}<br>Z: {z:.2f}"
+        err_str = f"<br><b>Error: {errors[i]:.3f} mm</b>" if errors is not None else ""
+        txt = f"<b>Node: {i}</b><br>{label}{err_str}<br>X: {x:.2f}<br>Y: {y:.2f}<br>Z: {z:.2f}"
         hover_text.append(txt)
     return hover_text
 
-def visualize_shapes(pos_gt, pos_init, pos_pred, edge_index, title="Shape Visualization"):
+def visualize_shapes(pos_gt, pos_pred, edge_index, node_errors=None, title="Shape Visualization"):
+    """
+    Visualizes GT and Prediction.
+    node_errors: (N,) numpy array of errors in mm. Used for coloring pred nodes.
+    """
     # 1. Data Prep
     pos_gt_np = _to_np(pos_gt)
     pos_pred_np = _to_np(pos_pred)
-    pos_init_np = _to_np(pos_init) if pos_init is not None else None
     edge_index_np = _to_np(edge_index)
+    node_errors_np = _to_np(node_errors) if node_errors is not None else None
     
     num_nodes = pos_gt_np.shape[0]
-    node_labels = [str(i) for i in range(num_nodes)] # ["0", "1", "2", ...]
+    node_labels = [str(i) for i in range(num_nodes)] 
     
     fig = go.Figure()
 
     # =========================================
-    # 1. Ground Truth (Green)
+    # 1. Ground Truth (Grey Ghost / Wireframe)
     # =========================================
-    fig.add_trace(go.Scatter3d(
-        x=pos_gt_np[:, 0], y=pos_gt_np[:, 1], z=pos_gt_np[:, 2],
-        mode='markers+text',
-        marker=dict(size=6, color='green', opacity=0.8),
-        text=node_labels, 
-        textposition="top center", # GT labels on TOP
-        textfont=dict(size=10, color='green'),
-        name='GT Nodes',
-        hoverinfo="text",
-        hovertext=_generate_hover_text(pos_gt_np, "Ground Truth")
-    ))
-
     # GT Edges
     gt_x, gt_y, gt_z = _generate_edge_lists(pos_gt_np, edge_index_np)
     fig.add_trace(go.Scatter3d(
         x=gt_x, y=gt_y, z=gt_z,
         mode='lines',
-        line=dict(color='green', width=2, dash='dot'),
+        line=dict(color='grey', width=2, dash='dot'),
         opacity=0.5,
-        name='GT Edges',
+        name='GT Structure',
         hoverinfo='none'
     ))
 
+    # GT Nodes (Small markers)
+    fig.add_trace(go.Scatter3d(
+        x=pos_gt_np[:, 0], y=pos_gt_np[:, 1], z=pos_gt_np[:, 2],
+        mode='markers',
+        marker=dict(size=4, color='grey', opacity=0.5),
+        name='GT Nodes',
+        hoverinfo="text",
+        hovertext=_generate_hover_text(pos_gt_np, "Ground Truth")
+    ))
+
     # =========================================
-    # 2. Prediction (Blue)
+    # 2. Prediction (Color-Coded by Error)
     # =========================================
-    # Pred Nodes - NOW WITH TEXT
+    
+    # Determine colors
+    if node_errors_np is not None:
+        # Scale: 0mm = Green, 5mm = Yellow, 10mm+ = Red
+        cmin, cmax = 0, 15 
+        marker_color = node_errors_np
+        colorscale = 'RdYlGn_r' # Reverse Red-Yellow-Green so Green is low error
+        colorbar_title = 'Error (mm)'
+    else:
+        marker_color = 'blue'
+        colorscale = None
+        cmin, cmax = None, None
+        colorbar_title = None
+
+    # Pred Nodes
     fig.add_trace(go.Scatter3d(
         x=pos_pred_np[:, 0], y=pos_pred_np[:, 1], z=pos_pred_np[:, 2],
-        mode='markers+text', # Changed from 'markers' to 'markers+text'
-        marker=dict(size=7, color='blue', symbol='diamond', opacity=1.0),
+        mode='markers+text', 
+        marker=dict(
+            size=8, 
+            color=marker_color, 
+            colorscale=colorscale, 
+            cmin=cmin, cmax=cmax,
+            showscale=True,
+            colorbar=dict(title=colorbar_title, x=0.85),
+            symbol='diamond', 
+            opacity=1.0
+        ),
         text=node_labels,
-        textposition="bottom center", # Pred labels on BOTTOM (to avoid overlap)
-        textfont=dict(size=10, color='blue'),
-        name='Pred Nodes',
+        textposition="bottom center",
+        textfont=dict(size=10, color='black'),
+        name='Prediction',
         hoverinfo="text",
-        hovertext=_generate_hover_text(pos_pred_np, "Prediction")
+        hovertext=_generate_hover_text(pos_pred_np, "Prediction", node_errors_np)
     ))
 
     # Pred Edges
@@ -90,33 +114,19 @@ def visualize_shapes(pos_gt, pos_init, pos_pred, edge_index, title="Shape Visual
     fig.add_trace(go.Scatter3d(
         x=pred_x, y=pred_y, z=pred_z,
         mode='lines',
-        line=dict(color='blue', width=3),
+        line=dict(color='black', width=3),
         opacity=0.8,
-        name='Pred Edges',
+        name='Pred Structure',
         hoverinfo='none'
     ))
     
-    # =========================================
-    # 3. Initialization (Orange)
-    # =========================================
-    if pos_init_np is not None:
-        fig.add_trace(go.Scatter3d(
-            x=pos_init_np[:, 0], y=pos_init_np[:, 1], z=pos_init_np[:, 2],
-            mode='markers',
-            marker=dict(size=5, color='orange', opacity=0.6),
-            name='Init Nodes',
-            hoverinfo="text",
-            hovertext=_generate_hover_text(pos_init_np, "Initialization"),
-            visible='legendonly' 
-        ))
-
     # =========================================
     # Layout
     # =========================================
     fig.update_layout(
         title=title,
-        width=1200,
-        height=800,
+        width=1000,
+        height=700,
         scene=dict(
             aspectmode='data', 
             xaxis_title='X (mm)',
@@ -124,7 +134,7 @@ def visualize_shapes(pos_gt, pos_init, pos_pred, edge_index, title="Shape Visual
             zaxis_title='Z (mm)',
             bgcolor='white'
         ),
-        legend=dict(x=0.7, y=0.9, bgcolor='rgba(255,255,255,0.8)')
+        legend=dict(x=0.05, y=0.9)
     )
 
     fig.show()
