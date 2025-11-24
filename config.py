@@ -4,7 +4,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Data Settings
 NUM_NODES = 12
-KNOWN_IDS = [0, 2, 7, 9]   
+KNOWN_IDS = [0, 2, 7]   
 
 # Model Architecture
 FEAT_DIM = 128
@@ -15,7 +15,7 @@ EDGE_DIM = 1
 # Training
 BATCH_SIZE = 8
 LR = 3e-4            # Slightly lower LR for stability
-NUM_EPOCHS = 200
+NUM_EPOCHS = 250
 
 # Normalization & Template
 GLOBAL_SCALE = 500.0 
