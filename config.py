@@ -1,6 +1,5 @@
 import os
 
-# Get the absolute path of the directory where config.py 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Data Settings
@@ -10,12 +9,12 @@ KNOWN_IDS = [0, 2, 7, 9]
 # Model Architecture
 FEAT_DIM = 128
 HIDDEN_DIM = 128
-GNN_LAYERS = 5
+GNN_LAYERS = 6       # Deep enough for complex shapes, stable with residuals
 EDGE_DIM = 1      
 
 # Training
 BATCH_SIZE = 8
-LR = 1e-4
+LR = 3e-4            # Slightly lower LR for stability
 NUM_EPOCHS = 200
 
 # Normalization & Template
@@ -30,4 +29,5 @@ LOG_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "training_log.csv")
 
 # Loss Weights
 W_POS = 10.0      
-W_EDGE = 2.0
+W_EDGE = 2.0      
+W_ANGLE = 1.0     # Orientation consistency
