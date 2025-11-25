@@ -1,34 +1,44 @@
+#engine/evaluator.py
 import torch
 import numpy as np
 from tqdm import tqdm
 import config
 from utils.visualization import visualize_shapes
 
-def evaluate_model(model, loader, device, return_detailed=False):
+def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
+    """
+    Evaluates the model on the given loader.
+    
+    Args:
+        return_detailed (bool): If True, returns (mean, std, per_node_stats).
+        verbose (bool): If True, prints the detailed ASCII table and progress bar. 
+                        Set False for cleaner training loops.
+    """
     model.eval()
     
     all_errors = []
     node_errors_tracker = {i: [] for i in range(config.NUM_NODES)} 
     
-    # Logic for Random Visualization
+    # Logic for Random Visualization (Only if verbose and detailed)
     VISUALIZE_LIMIT = 5
-    total_samples = len(loader.dataset)
     indices_to_visualize = set()
     
-    if return_detailed:
-        # Pick 10 random indices from the total dataset
+    if return_detailed and verbose:
+        total_samples = len(loader.dataset)
         num_to_pick = min(VISUALIZE_LIMIT, total_samples)
         if num_to_pick > 0:
             indices_to_visualize = set(np.random.choice(
                 total_samples, size=num_to_pick, replace=False
             ))
-        print(f"Visualizing random indices: {sorted(list(indices_to_visualize))}")
+            print(f"Visualizing random indices: {sorted(list(indices_to_visualize))}")
 
-    # Global counter to track which sample we are processing across batches
     current_sample_idx = 0
     
+    # Disable tqdm if not verbose to keep logs clean
+    iterator = tqdm(loader, desc="Evaluating", ncols=80) if verbose else loader
+    
     with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(loader, desc="Evaluating", ncols=80)):
+        for batch in iterator:
             batch = batch.to(device)
             
             # Forward pass
@@ -60,16 +70,11 @@ def evaluate_model(model, loader, device, return_detailed=False):
                     node_errors_tracker[n].append(err_n)
 
                 # --- VISUALIZATION TRIGGER ---
-                # Check if the current sample index is in our random list
-                if return_detailed and current_sample_idx in indices_to_visualize:
+                if return_detailed and verbose and (current_sample_idx in indices_to_visualize):
                     print(f"Visualizing Sample {current_sample_idx} (Error: {shape_err:.2f}mm)")
-                    
-                    # Extract single graph data for plotting
                     pos_gt_np = target[b].cpu().numpy()
                     pos_pred_np = pred[b].cpu().numpy()
                     edge_idx_np = batch.edge_index.cpu().numpy()
-                    
-                    # Get errors for this specific shape
                     current_node_errors = diff[b].cpu().numpy()
                     
                     visualize_shapes(
@@ -80,7 +85,6 @@ def evaluate_model(model, loader, device, return_detailed=False):
                         title=f"Sample {current_sample_idx} | Mean Err: {shape_err:.2f}mm"
                     )
                 
-                # Increment counter after processing each graph in the batch
                 current_sample_idx += 1
 
     # --- REPORTING ---
@@ -88,25 +92,29 @@ def evaluate_model(model, loader, device, return_detailed=False):
     mean_err = np.mean(all_errors) if len(all_errors) > 0 else 0
     std_err = np.std(all_errors) if len(all_errors) > 0 else 0
     
-    print(f"\n===== EVALUATION REPORT =====")
-    print(f"Overall Mean Error (Unknowns): {mean_err:.4f} mm")
-    print(f"Standard Deviation:            {std_err:.4f} mm")
-    print(f"-----------------------------")
-    print(f"| Node ID | Mean Err (mm) | Std Dev (mm) |")
-    print(f"|---------|---------------|--------------|")
-    
     per_node_stats = {}
     for n in range(config.NUM_NODES):
         n_errs = np.array(node_errors_tracker[n])
         n_mean = np.mean(n_errs) if len(n_errs) > 0 else 0
         n_std = np.std(n_errs) if len(n_errs) > 0 else 0
         per_node_stats[n] = {"mean": n_mean, "std": n_std}
+
+    # Only print the big table if verbose is True
+    if verbose:
+        print(f"\n===== EVALUATION REPORT =====")
+        print(f"Overall Mean Error (Unknowns): {mean_err:.4f} mm")
+        print(f"Standard Deviation:            {std_err:.4f} mm")
+        print(f"-----------------------------")
+        print(f"| Node ID | Mean Err (mm) | Std Dev (mm) |")
+        print(f"|---------|---------------|--------------|")
         
-        marker = "*" if n not in config.KNOWN_IDS else "" 
-        print(f"| {str(n)+marker:7} | {n_mean:13.4f} | {n_std:12.4f} |")
-    
-    print(f"-----------------------------")
-    print(f"* = Target Unknown Node\n")
+        for n in range(config.NUM_NODES):
+            marker = "*" if n not in config.KNOWN_IDS else "" 
+            stats = per_node_stats[n]
+            print(f"| {str(n)+marker:7} | {stats['mean']:13.4f} | {stats['std']:12.4f} |")
+        
+        print(f"-----------------------------")
+        print(f"* = Target Unknown Node\n")
 
     if return_detailed:
         return mean_err, std_err, per_node_stats

@@ -1,3 +1,4 @@
+#data/dataset.py
 import torch
 import pandas as pd
 import numpy as np
@@ -113,7 +114,7 @@ def get_dataloaders(landmarks_csv, edges_csv, batch_size, split=[0.8, 0.1, 0.1])
     
     # 3. Create independent datasets to control augmentation flags
     # We create new instances so Training gets augment=True, while others get False
-    train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=True)
+    train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
     val_data   = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
     test_data  = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
     

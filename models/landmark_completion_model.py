@@ -1,3 +1,4 @@
+#model/landmark_completion_model.py
 import torch
 import torch.nn as nn
 import numpy as np
@@ -51,7 +52,7 @@ class LandmarkCompletionModel(nn.Module):
         
         H = torch.matmul(P.transpose(1, 2), Q)
         U, S, Vt = torch.linalg.svd(H)
-        
+ #################################################################################3       
         # Reflection Correction
         R_candidate = torch.matmul(Vt.transpose(1, 2), U.transpose(1, 2))
         det = torch.det(R_candidate)
@@ -63,7 +64,7 @@ class LandmarkCompletionModel(nn.Module):
         R = torch.matmul(torch.matmul(U, I), Vt)
         t = target_c - torch.matmul(pred_c, R)
         return R, t
-
+############################################################################
     def align_template(self, batch_size, pos_target, known_mask, side):
         # Expand template
         template = self.mean_canonical_shape.unsqueeze(0).repeat(batch_size, 1, 1)
@@ -110,11 +111,11 @@ class LandmarkCompletionModel(nn.Module):
         feats = self.encoder(pos_centered, known_mask, side, batch_idx)
         feats_out, pos_out = self.processor(feats, pos_centered, edge_index, edge_attr_scaled)
         delta = self.decoder(feats_out)
-        
+        ############################################################################
         # 4. Unscale
         pos_pred_scaled = pos_out + delta
         pos_pred_unscaled = (pos_pred_scaled * config.GLOBAL_SCALE) + centroid_nodes
-        
+        ############################################################################
         # 5. Final Hard Anchor
         pred_view = pos_pred_unscaled.view(B, N, 3)
         R_final, t_final = self.batch_kabsch(pred_view, pos_reshaped, known_mask_reshaped)
