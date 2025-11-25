@@ -1,83 +1,158 @@
+#engine/trainer.py
 import torch
+import torch.optim as optim
+import matplotlib.pyplot as plt
 import os
-import csv
-from tqdm import tqdm
-from models import LandmarkCompletionModel
-from losses import CompositeLoss
 import config
-from .evaluator import evaluate_model
+from losses.composite_loss import CompositeLoss
+from models import LandmarkCompletionModel
 
-def log_to_csv(epoch, train_loss, val_error, log_path):
-    file_exists = os.path.isfile(log_path)
-    with open(log_path, 'a', newline='') as csvfile:
-        fieldnames = ['epoch', 'train_loss', 'val_error_mm']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        if not file_exists: writer.writeheader()
-        writer.writerow({'epoch': epoch, 'train_loss': train_loss, 'val_error_mm': val_error})
+class EarlyStopping:
+    """Stops training if validation loss doesn't improve after a given patience."""
+    def __init__(self, patience=20, min_delta=0.001):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_loss = float('inf')
+        self.early_stop = False
+
+    def __call__(self, val_loss):
+        if val_loss < self.best_loss - self.min_delta:
+            self.best_loss = val_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
 
 def train_engine(train_loader, val_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training on {device}...")
     
+    # 1. Initialize Model & Loss
     model = LandmarkCompletionModel().to(device)
     
-    # Load checkpoint if exists and requested
-    if args.resume and os.path.exists(args.checkpoint_path):
-        print(f"Resuming from {args.checkpoint_path}")
-        model.load_state_dict(torch.load(args.checkpoint_path, map_location=device))
+    if args.resume and os.path.exists(config.CHECKPOINT_PATH):
+        print(f"Resuming from {config.CHECKPOINT_PATH}...")
+        model.load_state_dict(torch.load(config.CHECKPOINT_PATH))
 
-    criterion = CompositeLoss(w_pos=config.W_POS, w_edge=config.W_EDGE, w_angle=config.W_ANGLE).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.LR, weight_decay=1e-5)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
-
-    best_val_error = float('inf')
+    # Using AdamW for better weight decay handling (helps generalization)
+    optimizer = optim.AdamW(model.parameters(), lr=config.LR, weight_decay=1e-4)
     
-    # Clear log if starting fresh
-    if not args.resume and os.path.exists(config.LOG_PATH):
-        os.remove(config.LOG_PATH)
+    # Scheduler: Reduce LR if validation loss plateaus (Stabilization)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=10, verbose=True
+    )
+    
+    criterion = CompositeLoss(w_pos=config.W_POS, w_edge=config.W_EDGE, w_angle=config.W_ANGLE)
+    early_stopper = EarlyStopping(patience=30) # Stop if no improvement for 30 epochs
+
+    train_loss_history = []
+    val_loss_history = []
+    best_val_loss = float('inf')
+
+    print(f"Starting training on {device} for {config.NUM_EPOCHS} epochs.")
+    print(f"Output path: {config.CHECKPOINT_PATH}")
+    print("-" * 60)
 
     for epoch in range(1, config.NUM_EPOCHS + 1):
         # --- TRAIN LOOP ---
         model.train()
-        total_loss = 0
+        running_loss = 0.0
         
-        pbar = tqdm(train_loader, desc=f"Ep {epoch}", ncols=100)
-        for batch in pbar:
+        for batch in train_loader:
             batch = batch.to(device)
-            pred, _ = model(batch)
+            optimizer.zero_grad()
             
-            B, N = batch.num_graphs, config.NUM_NODES
+            # Forward
+            pred_mm, pos_init_mm = model(batch)
             
-            loss, info = criterion(
-                pred=pred.view(B, N, 3), 
-                target=batch.pos.view(B, N, 3), 
-                known_mask=batch.known_mask.view(B, N),
-                edge_index=batch.edge_index,
+            # Reshape for Loss
+            B = batch.num_graphs
+            N = config.NUM_NODES
+            pred = pred_mm.view(B, N, 3)
+            target = batch.pos.view(B, N, 3)
+            known_mask = batch.known_mask.view(B, N)
+            
+            # Loss Calculation
+            loss, _ = criterion(
+                pred=pred, 
+                target=target, 
+                known_mask=known_mask, 
+                edge_index=batch.edge_index, 
                 edge_attr_gt=batch.edge_attr
             )
-
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-
-            total_loss += loss.item() * B
-            pbar.set_postfix({"Loss": f"{loss.item():.2f}"})
-
-        avg_train_loss = total_loss / len(train_loader.dataset)
-        
-        # --- VALIDATION LOOP ---
-        # We use the evaluator to get real MM error
-        if epoch % 1 == 0: # Validate every epoch
-            val_error = evaluate_model(model, val_loader, device)
             
-            scheduler.step(val_error)
-            log_to_csv(epoch, avg_train_loss, val_error, config.LOG_PATH)
+            loss.backward()
+            
+            # Gradient Clipping (CRITICAL for stability)
+            # Prevents gradients from exploding and causing "way off" predictions
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            running_loss += loss.item()
 
-            print(f"Ep {epoch}: Train Loss {avg_train_loss:.4f} | Val Err {val_error:.4f} mm")
+        avg_train_loss = running_loss / len(train_loader)
+        train_loss_history.append(avg_train_loss)
 
-            if val_error < best_val_error:
-                best_val_error = val_error
-                os.makedirs(os.path.dirname(args.checkpoint_path), exist_ok=True)
-                torch.save(model.state_dict(), args.checkpoint_path)
-                print(f"--> Best model saved!")
+        # --- VALIDATION LOOP (Calculate Loss, not just Metric) ---
+        model.eval()
+        running_val_loss = 0.0
+        with torch.no_grad():
+            for batch in val_loader:
+                batch = batch.to(device)
+                pred_mm, _ = model(batch)
+                
+                # Reshape
+                B = batch.num_graphs
+                N = config.NUM_NODES
+                pred = pred_mm.view(B, N, 3)
+                target = batch.pos.view(B, N, 3)
+                known_mask = batch.known_mask.view(B, N)
+                
+                val_loss_item, _ = criterion(
+                    pred=pred, 
+                    target=target, 
+                    known_mask=known_mask, 
+                    edge_index=batch.edge_index, 
+                    edge_attr_gt=batch.edge_attr
+                )
+                running_val_loss += val_loss_item.item()
+
+        avg_val_loss = running_val_loss / len(val_loader)
+        val_loss_history.append(avg_val_loss)
+
+        # --- CHECKPOINTING & LOGGING ---
+        # Update Scheduler
+        scheduler.step(avg_val_loss)
+        
+        # Save Best Model
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            torch.save(model.state_dict(), config.CHECKPOINT_PATH)
+            save_msg = " [Saved]"
+        else:
+            save_msg = ""
+
+        # Concise Print
+        print(f"Epoch [{epoch}/{config.NUM_EPOCHS}] "
+              f"Train Loss: {avg_train_loss:.4f} | "
+              f"Val Loss: {avg_val_loss:.4f}{save_msg}")
+
+        # Early Stopping check
+        early_stopper(avg_val_loss)
+        if early_stopper.early_stop:
+            print("Early stopping triggered. Training finished.")
+            break
+
+    # --- PLOTTING ---
+    plot_path = os.path.join(os.path.dirname(config.CHECKPOINT_PATH), "loss_curve.png")
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_loss_history, label='Train Loss')
+    plt.plot(val_loss_history, label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(plot_path)
+    print(f"\nTraining Complete. Loss curve saved to {plot_path}")

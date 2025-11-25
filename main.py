@@ -1,3 +1,4 @@
+# main.py
 import argparse
 import os
 import torch
@@ -44,6 +45,7 @@ def main():
         # Update config defaults with args if needed
         config.NUM_EPOCHS = args.epochs
         
+        # New clean training engine with plotting and stability fixes
         train_engine(train_loader, val_loader, args)
         
     elif args.mode == 'test':
@@ -54,10 +56,10 @@ def main():
 
         model = LandmarkCompletionModel().to(device)
         model.load_state_dict(torch.load(args.checkpoint_path, map_location=device))
-        print("Model loaded.")
+        print(f"Model loaded from {args.checkpoint_path}")
         
-        # Run Detailed Evaluation on Test Set
-        evaluate_model(model, test_loader, device, return_detailed=True)
+        # Run Detailed Evaluation on Test Set (Verbose=True enables the table)
+        evaluate_model(model, test_loader, device, return_detailed=True, verbose=True)
 
 if __name__ == "__main__":
     main()
