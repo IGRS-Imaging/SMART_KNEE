@@ -1,4 +1,3 @@
-#engine/evaluator.py
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -8,11 +7,6 @@ from utils.visualization import visualize_shapes
 def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
     """
     Evaluates the model on the given loader.
-    
-    Args:
-        return_detailed (bool): If True, returns (mean, std, per_node_stats).
-        verbose (bool): If True, prints the detailed ASCII table and progress bar. 
-                        Set False for cleaner training loops.
     """
     model.eval()
     
@@ -20,7 +14,7 @@ def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
     node_errors_tracker = {i: [] for i in range(config.NUM_NODES)} 
     
     # Logic for Random Visualization (Only if verbose and detailed)
-    VISUALIZE_LIMIT = 5
+    VISUALIZE_LIMIT = 36
     indices_to_visualize = set()
     
     if return_detailed and verbose:
@@ -34,7 +28,6 @@ def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
 
     current_sample_idx = 0
     
-    # Disable tqdm if not verbose to keep logs clean
     iterator = tqdm(loader, desc="Evaluating", ncols=80) if verbose else loader
     
     with torch.no_grad():
@@ -71,18 +64,28 @@ def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
 
                 # --- VISUALIZATION TRIGGER ---
                 if return_detailed and verbose and (current_sample_idx in indices_to_visualize):
-                    print(f"Visualizing Sample {current_sample_idx} (Error: {shape_err:.2f}mm)")
                     pos_gt_np = target[b].cpu().numpy()
                     pos_pred_np = pred[b].cpu().numpy()
                     edge_idx_np = batch.edge_index.cpu().numpy()
                     current_node_errors = diff[b].cpu().numpy()
                     
+                    # Extract Subject ID
+                    subj_id = None
+                    if hasattr(batch, 'subject'):
+                        # Batch.subject might be a list or simple list depending on collate
+                        if isinstance(batch.subject, list):
+                            subj_id = batch.subject[b]
+                        else:
+                            subj_id = str(batch.subject) # Fallback
+                    
+                    print(f" Visualizing Sample {current_sample_idx} Subject ID {subj_id} (Error: {shape_err:.2f}mm)")
                     visualize_shapes(
                         pos_gt=pos_gt_np,
                         pos_pred=pos_pred_np,
                         edge_index=edge_idx_np,
                         node_errors=current_node_errors,
-                        title=f"Sample {current_sample_idx} | Mean Err: {shape_err:.2f}mm"
+                        title=f"Sample {current_sample_idx} | Mean Err: {shape_err:.2f}mm",
+                        subject_id=subj_id
                     )
                 
                 current_sample_idx += 1

@@ -1,4 +1,3 @@
-#utils/visualization.py
 import torch
 import numpy as np
 import plotly.graph_objects as go
@@ -31,10 +30,11 @@ def _generate_hover_text(pos, label, errors=None):
         hover_text.append(txt)
     return hover_text
 
-def visualize_shapes(pos_gt, pos_pred, edge_index, node_errors=None, title="Shape Visualization"):
+def visualize_shapes(pos_gt, pos_pred, edge_index, node_errors=None, title="Shape Visualization", subject_id=None):
     """
     Visualizes GT and Prediction.
     node_errors: (N,) numpy array of errors in mm. Used for coloring pred nodes.
+    subject_id: (str) Optional subject identifier to display in title.
     """
     # 1. Data Prep
     pos_gt_np = _to_np(pos_gt)
@@ -124,8 +124,14 @@ def visualize_shapes(pos_gt, pos_pred, edge_index, node_errors=None, title="Shap
     # =========================================
     # Layout
     # =========================================
+    
+    # Construct Title
+    plot_title = title
+    if subject_id is not None:
+        plot_title = f"{title} | Subject: {subject_id}"
+
     fig.update_layout(
-        title=title,
+        title=plot_title,
         width=1000,
         height=700,
         scene=dict(

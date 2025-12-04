@@ -1,4 +1,3 @@
-#engine/trainer.py
 import torch
 import torch.optim as optim
 import matplotlib.pyplot as plt
@@ -8,7 +7,6 @@ from losses.composite_loss import CompositeLoss
 from models import LandmarkCompletionModel
 
 class EarlyStopping:
-    """Stops training if validation loss doesn't improve after a given patience."""
     def __init__(self, patience=20, min_delta=0.001):
         self.patience = patience
         self.min_delta = min_delta
@@ -28,30 +26,33 @@ class EarlyStopping:
 def train_engine(train_loader, val_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # 1. Initialize Model & Loss
     model = LandmarkCompletionModel().to(device)
     
     if args.resume and os.path.exists(config.CHECKPOINT_PATH):
         print(f"Resuming from {config.CHECKPOINT_PATH}...")
         model.load_state_dict(torch.load(config.CHECKPOINT_PATH))
 
-    # Using AdamW for better weight decay handling (helps generalization)
     optimizer = optim.AdamW(model.parameters(), lr=config.LR, weight_decay=1e-4)
     
-    # Scheduler: Reduce LR if validation loss plateaus (Stabilization)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=10, verbose=True
+        optimizer, mode='min', factor=0.5, patience=15, verbose=True
     )
     
-    criterion = CompositeLoss(w_pos=config.W_POS, w_edge=config.W_EDGE, w_angle=config.W_ANGLE)
-    early_stopper = EarlyStopping(patience=30) # Stop if no improvement for 30 epochs
+    # Init Loss with new W_GLOBAL
+    criterion = CompositeLoss(
+        w_pos=config.W_POS, 
+        w_edge=config.W_EDGE, 
+        w_angle=config.W_ANGLE,
+        w_global=config.W_GLOBAL
+    )
+    early_stopper = EarlyStopping(patience=50) 
 
     train_loss_history = []
     val_loss_history = []
     best_val_loss = float('inf')
 
     print(f"Starting training on {device} for {config.NUM_EPOCHS} epochs.")
-    print(f"Output path: {config.CHECKPOINT_PATH}")
+    print(f"Structure Weights -> Angle: {config.W_ANGLE}, Global: {config.W_GLOBAL}")
     print("-" * 60)
 
     for epoch in range(1, config.NUM_EPOCHS + 1):
@@ -59,22 +60,23 @@ def train_engine(train_loader, val_loader, args):
         model.train()
         running_loss = 0.0
         
+        # Track components for logging
+        loss_components = {"L_pos": 0, "L_edge": 0, "L_angle": 0, "L_global": 0}
+        
         for batch in train_loader:
             batch = batch.to(device)
             optimizer.zero_grad()
             
-            # Forward
-            pred_mm, pos_init_mm = model(batch)
+            pred_mm, _ = model(batch)
             
-            # Reshape for Loss
+            # Reshape
             B = batch.num_graphs
             N = config.NUM_NODES
             pred = pred_mm.view(B, N, 3)
             target = batch.pos.view(B, N, 3)
             known_mask = batch.known_mask.view(B, N)
             
-            # Loss Calculation
-            loss, _ = criterion(
+            loss, comp = criterion(
                 pred=pred, 
                 target=target, 
                 known_mask=known_mask, 
@@ -83,18 +85,18 @@ def train_engine(train_loader, val_loader, args):
             )
             
             loss.backward()
-            
-            # Gradient Clipping (CRITICAL for stability)
-            # Prevents gradients from exploding and causing "way off" predictions
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
             running_loss += loss.item()
+            
+            # Aggregate components
+            for k, v in comp.items():
+                loss_components[k] += v
 
         avg_train_loss = running_loss / len(train_loader)
         train_loss_history.append(avg_train_loss)
 
-        # --- VALIDATION LOOP (Calculate Loss, not just Metric) ---
+        # --- VALIDATION LOOP ---
         model.eval()
         running_val_loss = 0.0
         with torch.no_grad():
@@ -102,7 +104,6 @@ def train_engine(train_loader, val_loader, args):
                 batch = batch.to(device)
                 pred_mm, _ = model(batch)
                 
-                # Reshape
                 B = batch.num_graphs
                 N = config.NUM_NODES
                 pred = pred_mm.view(B, N, 3)
@@ -121,11 +122,9 @@ def train_engine(train_loader, val_loader, args):
         avg_val_loss = running_val_loss / len(val_loader)
         val_loss_history.append(avg_val_loss)
 
-        # --- CHECKPOINTING & LOGGING ---
-        # Update Scheduler
+        # --- CHECKPOINTING ---
         scheduler.step(avg_val_loss)
         
-        # Save Best Model
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             torch.save(model.state_dict(), config.CHECKPOINT_PATH)
@@ -133,15 +132,23 @@ def train_engine(train_loader, val_loader, args):
         else:
             save_msg = ""
 
-        # Concise Print
-        print(f"Epoch [{epoch}/{config.NUM_EPOCHS}] "
-              f"Train Loss: {avg_train_loss:.4f} | "
-              f"Val Loss: {avg_val_loss:.4f}{save_msg}")
+        # Verbose log every 10 epochs
+        if epoch % 10 == 0 or epoch == 1:
+            # Avg components per batch
+            n_batches = len(train_loader)
+            log_str = (f"Ep {epoch} | Pos: {loss_components['L_pos']/n_batches:.2f} "
+                       f"Edge: {loss_components['L_edge']/n_batches:.2f} "
+                       f"Ang: {loss_components['L_angle']/n_batches:.4f} "
+                       f"Glob: {loss_components['L_global']/n_batches:.2f}")
+            print(log_str)
 
-        # Early Stopping check
+        print(f"Epoch [{epoch}/{config.NUM_EPOCHS}] "
+              f"Train: {avg_train_loss:.4f} | "
+              f"Val: {avg_val_loss:.4f}{save_msg}")
+
         early_stopper(avg_val_loss)
         if early_stopper.early_stop:
-            print("Early stopping triggered. Training finished.")
+            print("Early stopping triggered.")
             break
 
     # --- PLOTTING ---
@@ -155,4 +162,4 @@ def train_engine(train_loader, val_loader, args):
     plt.legend()
     plt.grid(True)
     plt.savefig(plot_path)
-    print(f"\nTraining Complete. Loss curve saved to {plot_path}")
+    print(f"\nTraining Complete. Curve at {plot_path}")
