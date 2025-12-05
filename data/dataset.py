@@ -82,7 +82,7 @@ def get_dataloaders(landmarks_csv, edges_csv, batch_size, split=[0.8, 0.1, 0.1])
     train_subset, val_subset, test_subset = random_split(
         full_dataset,
         [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(42),
+        generator=torch.Generator().manual_seed(16),
     )
 
     train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)

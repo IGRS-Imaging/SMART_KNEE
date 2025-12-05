@@ -13,6 +13,7 @@ class EGNNLayer(nn.Module):
         self.edge_mlp = nn.Sequential(
             nn.Linear(in_edge_dim, m_dim),
             nn.SiLU(),
+            nn.Dropout(0.1),
             nn.Linear(m_dim, m_dim),
             nn.SiLU(),
             nn.LayerNorm(m_dim) # Stabilization
@@ -27,6 +28,7 @@ class EGNNLayer(nn.Module):
         self.node_mlp = nn.Sequential(
             nn.Linear(feat_dim + m_dim, feat_dim),
             nn.SiLU(),
+            nn.Dropout(0.1),
             nn.Linear(feat_dim, feat_dim),
             nn.LayerNorm(feat_dim) # Stabilization
         )

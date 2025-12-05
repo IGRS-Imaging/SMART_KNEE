@@ -32,7 +32,7 @@ def train_engine(train_loader, val_loader, args):
         print(f"Resuming from {config.CHECKPOINT_PATH}...")
         model.load_state_dict(torch.load(config.CHECKPOINT_PATH))
 
-    optimizer = optim.AdamW(model.parameters(), lr=config.LR, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=config.LR, weight_decay=1e-3)
     
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=15, verbose=True
