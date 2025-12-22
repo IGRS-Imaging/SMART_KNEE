@@ -1,4 +1,4 @@
-#model/egnn_processor.py
+# model/egnn_processor.py
 import torch
 import torch.nn as nn
 from torch_scatter import scatter_add
@@ -16,7 +16,7 @@ class EGNNLayer(nn.Module):
             nn.Dropout(0.1),
             nn.Linear(m_dim, m_dim),
             nn.SiLU(),
-            nn.LayerNorm(m_dim) # Stabilization
+            nn.LayerNorm(m_dim)
         )
 
         self.coord_mlp = nn.Sequential(
@@ -30,7 +30,7 @@ class EGNNLayer(nn.Module):
             nn.SiLU(),
             nn.Dropout(0.1),
             nn.Linear(feat_dim, feat_dim),
-            nn.LayerNorm(feat_dim) # Stabilization
+            nn.LayerNorm(feat_dim)
         )
 
     def forward(self, x, pos, edge_index, edge_attr):
@@ -42,7 +42,6 @@ class EGNNLayer(nn.Module):
         dist = diff.norm(dim=-1, keepdim=True) + 1e-8 
         
         # 2. Edge Features: [Node_i, Node_j, Distance, Edge_Attr]
-        # We use 'dist' (linear) instead of 'dist^2' for better gradient scaling
         e_ij = torch.cat([x[row], x[col], dist, edge_attr], dim=-1)
         
         # 3. Compute Message
@@ -52,9 +51,10 @@ class EGNNLayer(nn.Module):
         # Predict a scalar weight 'trans'
         trans = self.coord_mlp(m_ij)
         
-        # Clamp the MAGNITUDE of the step, not the position itself
-        # This allows movement but prevents single-step explosions
-        trans = torch.clamp(trans, min=-5.0, max=5.0)
+        # CLAMP FIX: Tightened from 5.0 to 0.2
+        # In normalized space (divided by 500), 0.2 represents a 100mm step.
+        # This prevents the model from exploding the shape in early training.
+        trans = torch.clamp(trans, min=-2.0, max=2.0)
         
         # Normalize the direction vector: diff / dist
         # delta = weight * direction

@@ -47,6 +47,7 @@ def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
             unknown_mask = ~known_mask
             
             # (B, N) Euclidean Error
+            # Note: Error is invariant to reflection, so we calculate it here on the "Right" version
             diff = (pred - target).norm(dim=-1)
             
             # Store errors
@@ -72,11 +73,20 @@ def evaluate_model(model, loader, device, return_detailed=False, verbose=True):
                     # Extract Subject ID
                     subj_id = None
                     if hasattr(batch, 'subject'):
-                        # Batch.subject might be a list or simple list depending on collate
                         if isinstance(batch.subject, list):
                             subj_id = batch.subject[b]
                         else:
                             subj_id = str(batch.subject) # Fallback
+                    
+                    # --- RESTORE CHIRALITY FOR VISUALIZATION ---
+                    # The dataset flipped Left bones to Right. We want to see them as Left.
+                    # 0 = Left (Originally), 1 = Right
+                    if hasattr(batch, 'original_side'):
+                        # Check if this specific sample (b) was originally Left (0)
+                        if batch.original_side[b] == 0:
+                            # Flip X-axis back (Multiply by -1)
+                            pos_gt_np[:, 0] *= -1
+                            pos_pred_np[:, 0] *= -1
                     
                     print(f" Visualizing Sample {current_sample_idx} Subject ID {subj_id} (Error: {shape_err:.2f}mm)")
                     visualize_shapes(

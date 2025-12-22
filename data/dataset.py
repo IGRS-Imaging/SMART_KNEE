@@ -7,23 +7,28 @@ from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 import config
 
-
 def get_known_mask():
     mask = np.zeros(config.NUM_NODES, dtype=bool)
     mask[config.KNOWN_IDS] = True
     return mask
-
 
 def extract_coords(row):
     coords = row.iloc[1: 1 + 3 * config.NUM_NODES].astype(float).values
     coords = coords.reshape(config.NUM_NODES, 3)
     return coords
 
-
-def get_chirality(name):
-    name = str(name).upper()
-    return 0 if name.endswith("_L") else 1
-
+def kabsch_error(P, Q):
+    Pc = np.mean(P, axis=0)
+    Qc = np.mean(Q, axis=0)
+    P_centered = P - Pc
+    Q_centered = Q - Qc
+    H = P_centered.T @ Q_centered
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+    if np.linalg.det(R) < 0:
+        Vt[2, :] *= -1
+        R = Vt.T @ U.T
+    return np.sqrt(np.mean(((P_centered @ R.T) - Q_centered)**2))
 
 class LoadFemurDataset(Dataset):
     def __init__(self, landmarks_csv_path, edges_csv_path, augment=False):
@@ -32,29 +37,77 @@ class LoadFemurDataset(Dataset):
         self.edges_df = pd.read_csv(edges_csv_path)
         self.augment = augment
 
+        # --- EDGE DATA CHECK ---
+        # Check if subjects match between landmarks and edges
+        landmark_subjects = set(self.landmarks_df["Source"].unique())
+        edge_subjects = set(self.edges_df.columns)
+        missing = len(landmark_subjects - edge_subjects)
+        if missing > 0:
+            print(f"⚠️ WARNING: {missing} subjects from Landmarks CSV are missing in Edges CSV!")
+            print("These will default to 0.0 edge length, which hurts training.")
+
         edge_idx = self.edges_df[["V1", "V2"]].values - 1
         self.edge_index = torch.tensor(edge_idx.T, dtype=torch.long)
+
+        try:
+            self.mean_shape = np.load(config.MEAN_SHAPE_PATH)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Missing mean shape: {config.MEAN_SHAPE_PATH}")
 
     def __len__(self):
         return len(self.landmarks_df)
 
+    def augment_samples(self, pos):
+        # 1. Random Scaling
+        scale = np.random.uniform(0.9, 1.1)
+        pos = pos * scale
+
+        # 2. Random Rotation
+        theta_x = np.random.uniform(0, 2 * np.pi)
+        theta_y = np.random.uniform(0, 2 * np.pi)
+        theta_z = np.random.uniform(0, 2 * np.pi)
+
+        Rx = np.array([[1, 0, 0], [0, np.cos(theta_x), -np.sin(theta_x)], [0, np.sin(theta_x), np.cos(theta_x)]])
+        Ry = np.array([[np.cos(theta_y), 0, np.sin(theta_y)], [0, 1, 0], [-np.sin(theta_y), 0, np.cos(theta_y)]])
+        Rz = np.array([[np.cos(theta_z), -np.sin(theta_z), 0], [np.sin(theta_z), np.cos(theta_z), 0], [0, 0, 1]])
+
+        R = Rz @ Ry @ Rx
+        pos = pos @ R.T
+
+        # 3. Gaussian Jitter (ENABLED NOW)
+        # Adds 0.5mm - 1.0mm noise to force model to learn structure, not just memory
+        # noise = np.random.normal(0, 1.0, pos.shape) 
+        # pos = pos + noise
+        
+        return pos
+
     def __getitem__(self, idx):
         row = self.landmarks_df.iloc[idx]
         subject = row["Source"]
+        coords = extract_coords(row) 
 
-        coords = extract_coords(row)
-        pos = torch.tensor(coords, dtype=torch.float32)
-        side = get_chirality(subject)
+        # Chirality Correction
+        err_original = kabsch_error(coords, self.mean_shape)
+        coords_flipped = coords.copy()
+        coords_flipped[:, 0] *= -1
+        err_flipped = kabsch_error(coords_flipped, self.mean_shape)
+        
+        is_flipped = False
+        if err_flipped < err_original:
+            coords = coords_flipped
+            is_flipped = True
+        
+        side = 1 
 
-        # Augmentation: ONLY Left/Right flip (no random rotation now)
         if self.augment:
-            if torch.rand(1) > 0.5:
-                pos[:, 0] = -pos[:, 0]
-                side = 1 - side
+            coords = self.augment_samples(coords)
+        
+        pos = torch.tensor(coords, dtype=torch.float32)
 
         if subject in self.edges_df.columns:
             dists = self.edges_df[subject].values.astype(float)
         else:
+            # This is the danger zone. If this happens, model tries to shrink bone to 0.
             dists = np.zeros(self.edge_index.size(1))
 
         edge_attr = torch.tensor(dists, dtype=torch.float32).unsqueeze(-1)
@@ -66,26 +119,25 @@ class LoadFemurDataset(Dataset):
             known_mask=torch.tensor(get_known_mask(), dtype=torch.bool),
             side=torch.tensor(side, dtype=torch.long),
             subject=str(subject),
+            original_side=torch.tensor(0 if is_flipped else 1, dtype=torch.long), 
             num_nodes=config.NUM_NODES,
         )
         return data
 
-
+# (get_dataloaders remains unchanged)
 def get_dataloaders(landmarks_csv, edges_csv, batch_size, split=[0.8, 0.1, 0.1]):
     full_dataset = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
     total_size = len(full_dataset)
-
     train_size = int(total_size * split[0])
     val_size = int(total_size * split[1])
     test_size = total_size - train_size - val_size
 
     train_subset, val_subset, test_subset = random_split(
-        full_dataset,
-        [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(16),
+        full_dataset, [train_size, val_size, test_size],
+        generator=torch.Generator().manual_seed(42)
     )
 
-    train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
+    train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=True) 
     val_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
     test_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
 
