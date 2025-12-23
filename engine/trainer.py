@@ -45,7 +45,7 @@ def train_engine(train_loader, val_loader, args):
         w_angle=config.W_ANGLE,
         w_global=config.W_GLOBAL
     )
-    early_stopper = EarlyStopping(patience=50) 
+    early_stopper = EarlyStopping(patience=30) 
 
     train_loss_history = []
     val_loss_history = []

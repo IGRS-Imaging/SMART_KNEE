@@ -58,27 +58,32 @@ class LoadFemurDataset(Dataset):
         return len(self.landmarks_df)
 
     def augment_samples(self, pos):
-        # 1. Random Scaling
-        scale = np.random.uniform(0.9, 1.1)
+        # 1. Small anatomical scaling
+        scale = np.random.uniform(0.97, 1.03)
         pos = pos * scale
 
-        # 2. Random Rotation
-        theta_x = np.random.uniform(0, 2 * np.pi)
-        theta_y = np.random.uniform(0, 2 * np.pi)
-        theta_z = np.random.uniform(0, 2 * np.pi)
+        # 2. Random rotation
+        angles = np.random.uniform(0, 2 * np.pi, size=3)
+        cx, cy, cz = np.cos(angles)
+        sx, sy, sz = np.sin(angles)
 
-        Rx = np.array([[1, 0, 0], [0, np.cos(theta_x), -np.sin(theta_x)], [0, np.sin(theta_x), np.cos(theta_x)]])
-        Ry = np.array([[np.cos(theta_y), 0, np.sin(theta_y)], [0, 1, 0], [-np.sin(theta_y), 0, np.cos(theta_y)]])
-        Rz = np.array([[np.cos(theta_z), -np.sin(theta_z), 0], [np.sin(theta_z), np.cos(theta_z), 0], [0, 0, 1]])
+        Rx = np.array([[1, 0, 0],
+                    [0, cx, -sx],
+                    [0, sx, cx]])
+        Ry = np.array([[cy, 0, sy],
+                    [0, 1, 0],
+                    [-sy, 0, cy]])
+        Rz = np.array([[cz, -sz, 0],
+                    [sz, cz, 0],
+                    [0, 0, 1]])
 
         R = Rz @ Ry @ Rx
         pos = pos @ R.T
 
-        # 3. Gaussian Jitter (ENABLED NOW)
-        # Adds 0.5mm - 1.0mm noise to force model to learn structure, not just memory
-        # noise = np.random.normal(0, 1.0, pos.shape) 
-        # pos = pos + noise
-        
+        # 3. Reduced Gaussian noise (realistic)
+        noise = np.random.normal(0, 0.3, pos.shape)
+        pos = pos + noise
+
         return pos
 
     def __getitem__(self, idx):
@@ -134,7 +139,7 @@ def get_dataloaders(landmarks_csv, edges_csv, batch_size, split=[0.8, 0.1, 0.1])
 
     train_subset, val_subset, test_subset = random_split(
         full_dataset, [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(42)
+        generator=torch.Generator().manual_seed(16)
     )
 
     train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=True) 
