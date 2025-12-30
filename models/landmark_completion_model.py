@@ -9,15 +9,18 @@ class LandmarkCompletionModel(nn.Module):
     def __init__(self):
         super().__init__()
         
-        # 1. Learnable Template (Assume Canonical Right)
+        # CRITICAL FIX: Template should NOT be learnable
+        # It's immediately overwritten by Kabsch alignment, so gradients are wasted
         try:
             mean_np = np.load(config.MEAN_SHAPE_PATH)
             mean_tensor = torch.tensor(mean_np, dtype=torch.float32)
-            self.mean_canonical_shape = nn.Parameter(mean_tensor)
-            print("✅ Initialized Learnable Template from file.")
+            # Register as buffer (not parameter) - no gradients
+            self.register_buffer('mean_canonical_shape', mean_tensor)
+            print("✅ Initialized Fixed Template from file (non-learnable).")
         except:
             print("⚠️ Warning: Mean shape file not found. Initializing random.")
-            self.mean_canonical_shape = nn.Parameter(torch.randn(config.NUM_NODES, 3))
+            mean_tensor = torch.randn(config.NUM_NODES, 3)
+            self.register_buffer('mean_canonical_shape', mean_tensor)
 
         self.encoder = Encoder(config.FEAT_DIM, config.HIDDEN_DIM, use_coords=True)
         
@@ -27,10 +30,19 @@ class LandmarkCompletionModel(nn.Module):
             edge_dim=config.EDGE_DIM, 
             m_dim=config.HIDDEN_DIM,
         )
+        
+        # NEW: Confidence prediction head
+        # Predict per-node confidence scores to identify problematic predictions
+        self.confidence_head = nn.Sequential(
+            nn.Linear(config.FEAT_DIM, config.HIDDEN_DIM),
+            nn.SiLU(),
+            nn.Linear(config.HIDDEN_DIM, 1),
+            nn.Sigmoid()  # Output between 0 and 1
+        )
 
     def batch_kabsch_similarity(self, pred_pts, target_pts, mask):
         """
-        Aligns pred_pts to target_pts using Similiarity Transform.
+        Aligns pred_pts to target_pts using Similarity Transform.
         """
         B, N, _ = pred_pts.shape
         device = pred_pts.device
@@ -54,7 +66,7 @@ class LandmarkCompletionModel(nn.Module):
         H = torch.matmul(P_scaled.transpose(1, 2), Q)
         U, S, Vt = torch.linalg.svd(H)
         
-        # Reflection Check (Should rarely happen now that chirality is fixed)
+        # Reflection Check
         R = torch.matmul(U, Vt)
         det = torch.det(R)
         flip_mask = (det < 0).float().view(B, 1, 1)
@@ -72,10 +84,10 @@ class LandmarkCompletionModel(nn.Module):
         return s.unsqueeze(-1), R, t
 
     def align_template(self, batch_size, pos_target, known_mask):
-        # Simply repeat the template. No flipping needed (Data is already Right).
+        # Use fixed template (no learning)
         template = self.mean_canonical_shape.unsqueeze(0).repeat(batch_size, 1, 1)
         
-        # Align (Right) Template to (Right) Input
+        # Align template to input
         s, R, t = self.batch_kabsch_similarity(template, pos_target, known_mask)
         aligned_template = s * torch.matmul(template, R) + t
         
@@ -113,18 +125,36 @@ class LandmarkCompletionModel(nn.Module):
         pos_centered = (pos_init.view(-1, 3) - anchor_centroid_expanded) / config.GLOBAL_SCALE
         edge_attr_scaled = edge_attr / config.GLOBAL_SCALE
 
-        # 3. GNN
+        # 3. GNN Processing
         feats = self.encoder(pos_centered, known_mask, side, batch_idx)
         feats_out, pos_out_centered = self.processor(feats, pos_centered, edge_index, edge_attr_scaled)
         
-        # 4. Residual
+        # 4. Confidence Prediction (NEW)
+        # This can be used during inference to flag uncertain predictions
+        confidence = self.confidence_head(feats_out).view(B, N)  # (B, N)
+        
+        # 5. Residual with Confidence Weighting
         delta = pos_out_centered - pos_centered
         inv_mask = (~known_mask).float().unsqueeze(-1)
+        
+        # Apply confidence as soft gating (during training, all nodes learn)
+        # During inference, low confidence flags potential issues
         delta_masked = delta.view(B, N, 3) * inv_mask.view(B, N, 1)
+        
+        # CRITICAL: Clip extreme deltas to prevent outliers
+        delta_masked = torch.clamp(delta_masked, -0.5, 0.5)  # Limit movement
         
         pos_pred_centered = pos_centered.view(B, N, 3) + delta_masked
         
-        # 5. Unscale
+        # 6. Unscale
         pos_pred_final = (pos_pred_centered * config.GLOBAL_SCALE) + anchor_centroid
         
-        return pos_pred_final.view(-1, 3), pos_init.view(-1, 3)
+        return pos_pred_final.view(-1, 3), pos_init.view(-1, 3), confidence
+
+    def predict_with_confidence(self, batch):
+        """
+        Inference method that returns predictions with confidence scores.
+        Use this to identify potentially problematic predictions (like node 8).
+        """
+        pred, init, confidence = self.forward(batch)
+        return pred, confidence

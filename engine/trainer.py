@@ -7,7 +7,7 @@ from losses.composite_loss import CompositeLoss
 from models import LandmarkCompletionModel
 
 class EarlyStopping:
-    def __init__(self, patience=20, min_delta=0.001):
+    def __init__(self, patience=40, min_delta=0.001):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
@@ -32,27 +32,38 @@ def train_engine(train_loader, val_loader, args):
         print(f"Resuming from {config.CHECKPOINT_PATH}...")
         model.load_state_dict(torch.load(config.CHECKPOINT_PATH))
 
-    optimizer = optim.AdamW(model.parameters(), lr=config.LR, weight_decay=1e-3)
-    
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=15, verbose=True
+    optimizer = optim.AdamW(
+        model.parameters(), 
+        lr=config.LR, 
+        weight_decay=5e-4,  # Moderate regularization
+        betas=(0.9, 0.999)
     )
     
-    # Init Loss with new W_GLOBAL
+    # Use ReduceLROnPlateau - more stable than cosine annealing
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 
+        mode='min', 
+        factor=0.5, 
+        patience=20,
+        verbose=True,
+        min_lr=1e-6
+    )
+    
     criterion = CompositeLoss(
         w_pos=config.W_POS, 
         w_edge=config.W_EDGE, 
         w_angle=config.W_ANGLE,
-        w_global=config.W_GLOBAL
+        w_local_struct=config.W_LOCAL_STRUCT
     )
-    early_stopper = EarlyStopping(patience=30) 
+    early_stopper = EarlyStopping(patience=50)
 
     train_loss_history = []
     val_loss_history = []
     best_val_loss = float('inf')
 
     print(f"Starting training on {device} for {config.NUM_EPOCHS} epochs.")
-    print(f"Structure Weights -> Angle: {config.W_ANGLE}, Global: {config.W_GLOBAL}")
+    print(f"Model: FEAT={config.FEAT_DIM}, HIDDEN={config.HIDDEN_DIM}, LAYERS={config.GNN_LAYERS}")
+    print(f"Weights -> Pos:{config.W_POS}, Edge:{config.W_EDGE}, Angle:{config.W_ANGLE}, Struct:{config.W_LOCAL_STRUCT}")
     print("-" * 60)
 
     for epoch in range(1, config.NUM_EPOCHS + 1):
@@ -60,16 +71,14 @@ def train_engine(train_loader, val_loader, args):
         model.train()
         running_loss = 0.0
         
-        # Track components for logging
-        loss_components = {"L_pos": 0, "L_edge": 0, "L_angle": 0, "L_global": 0}
+        loss_components = {"L_pos": 0, "L_edge": 0, "L_angle": 0, "L_local_struct": 0}
         
         for batch in train_loader:
             batch = batch.to(device)
             optimizer.zero_grad()
             
-            pred_mm, _ = model(batch)
+            pred_mm, _, confidence = model(batch)
             
-            # Reshape
             B = batch.num_graphs
             N = config.NUM_NODES
             pred = pred_mm.view(B, N, 3)
@@ -84,12 +93,16 @@ def train_engine(train_loader, val_loader, args):
                 edge_attr_gt=batch.edge_attr
             )
             
+            # Check for NaN
+            if torch.isnan(loss):
+                print("WARNING: NaN loss detected, skipping batch")
+                continue
+            
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             running_loss += loss.item()
             
-            # Aggregate components
             for k, v in comp.items():
                 loss_components[k] += v
 
@@ -102,7 +115,7 @@ def train_engine(train_loader, val_loader, args):
         with torch.no_grad():
             for batch in val_loader:
                 batch = batch.to(device)
-                pred_mm, _ = model(batch)
+                pred_mm, _, _ = model(batch)
                 
                 B = batch.num_graphs
                 N = config.NUM_NODES
@@ -134,17 +147,18 @@ def train_engine(train_loader, val_loader, args):
 
         # Verbose log every 10 epochs
         if epoch % 10 == 0 or epoch == 1:
-            # Avg components per batch
             n_batches = len(train_loader)
             log_str = (f"Ep {epoch} | Pos: {loss_components['L_pos']/n_batches:.2f} "
                        f"Edge: {loss_components['L_edge']/n_batches:.2f} "
                        f"Ang: {loss_components['L_angle']/n_batches:.4f} "
-                       f"Glob: {loss_components['L_global']/n_batches:.2f}")
+                       f"Struct: {loss_components['L_local_struct']/n_batches:.2f}")
             print(log_str)
 
+        current_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch [{epoch}/{config.NUM_EPOCHS}] "
               f"Train: {avg_train_loss:.4f} | "
-              f"Val: {avg_val_loss:.4f}{save_msg}")
+              f"Val: {avg_val_loss:.4f} | "
+              f"LR: {current_lr:.2e}{save_msg}")
 
         early_stopper(avg_val_loss)
         if early_stopper.early_stop:
@@ -152,14 +166,15 @@ def train_engine(train_loader, val_loader, args):
             break
 
     # --- PLOTTING ---
-    plot_path = os.path.join(os.path.dirname(config.CHECKPOINT_PATH), "loss_curve.png")
+    plot_path = os.path.join(os.path.dirname(config.CHECKPOINT_PATH), "loss_curve_v3.png")
     plt.figure(figsize=(10, 6))
     plt.plot(train_loss_history, label='Train Loss')
     plt.plot(val_loss_history, label='Validation Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
+    plt.title('Training and Validation Loss (v3 - Stable)')
     plt.legend()
     plt.grid(True)
     plt.savefig(plot_path)
     print(f"\nTraining Complete. Curve at {plot_path}")
+    print(f"Best Val Loss: {best_val_loss:.4f}")

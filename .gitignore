@@ -52,4 +52,5 @@ node_modules/
 /test_jupyter_notebooks
 environment-cpu.yml
 checkpoints/
+data/csv/
 
