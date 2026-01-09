@@ -5,12 +5,12 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 # Data Settings
 
 # # Femur
-# NUM_NODES = 12
-# KNOWN_IDS = [0, 2, 7]   
+NUM_NODES = 12
+KNOWN_IDS = [0, 9, 6, 7]   
 
 # Tibia
-NUM_NODES = 11
-KNOWN_IDS = [3, 5, 6]
+# NUM_NODES = 11
+# KNOWN_IDS = [ 3, 4, 9, 10]
 
 # Model Architecture
 FEAT_DIM = 128  # Back to original (192 was overkill)
@@ -27,22 +27,22 @@ NUM_EPOCHS = 200
 GLOBAL_SCALE = 500.0 
 
 # =================================== Femur =====================================
-# MEAN_SHAPE_PATH = os.path.join(PROJECT_ROOT, "data", "mean_canonical_shape.npy") 
-# LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "FEMUR_LANDMARKS.csv")
-# EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "Femur_Edges.csv")
-# CHECKPOINT_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "best_model.pt")
-# TEST_MODEL_PATH = CHECKPOINT_PATH
-# LOG_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "training_log.csv") 
-
-# ================================= Tibia =================================
-MEAN_SHAPE_PATH = os.path.join(PROJECT_ROOT, "data", "mean_canonical_shape_tibia.npy") 
-# LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "TIBIA_LANDMARKS_A.csv")
-LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "batchreplace_lm.csv")
-# EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "Tibia_EDGES.csv")
-EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "batchreplace_edges.csv")
-CHECKPOINT_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "best_model_tibia.pt")
+MEAN_SHAPE_PATH = os.path.join(PROJECT_ROOT, "data", "mean_canonical_shape.npy") 
+LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "FEMUR_LANDMARKS.csv")
+EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "Femur_Edges.csv")
+CHECKPOINT_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "best_model.pt")
 TEST_MODEL_PATH = CHECKPOINT_PATH
 LOG_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "training_log.csv") 
+
+# ================================= Tibia =================================
+# MEAN_SHAPE_PATH = os.path.join(PROJECT_ROOT, "data", "mean_canonical_shape_tibia.npy") 
+# # LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "TIBIA_LANDMARKS_A.csv")
+# LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", "batchreplace_lm.csv")
+# # EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "Tibia_EDGES.csv")
+# EDGES_CSV = os.path.join(PROJECT_ROOT, "data", "batchreplace_edges.csv")
+# CHECKPOINT_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "best_model_tibia.pt")
+# TEST_MODEL_PATH = CHECKPOINT_PATH
+# LOG_PATH = os.path.join(PROJECT_ROOT, "checkpoints", "training_log.csv") 
 
 # Loss Weights
 W_POS = 5.0  

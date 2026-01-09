@@ -14,14 +14,14 @@ class Encoder(nn.Module):
         self.known_emb = nn.Embedding(2, hidden)
 
         coord_dim = 3 if use_coords else 0
-        
+        num_anchors = len(config.KNOWN_IDS)
         # ENHANCED GEOMETRIC FEATURES
         # 1. Distances to anchors (3)
         # 2. Distance to centroid (1)
         # 3. Relative position to each anchor (3*3=9) - NEW
         # 4. Distance variance (1) - NEW
         # 5. Bone axis projection (2) - NEW
-        geo_dim = 3 + 1 + 9 + 1 + 2
+        geo_dim = num_anchors + 1 + (num_anchors * 3) + 1 + 2
         
         in_dim = hidden * 3 + coord_dim + geo_dim
 
