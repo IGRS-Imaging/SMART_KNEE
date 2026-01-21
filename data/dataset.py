@@ -56,38 +56,24 @@ class LoadFemurDataset(Dataset):
         return len(self.landmarks_df)
 
     def augment_samples(self, pos):
-        """
-        CRITICAL FIX: Reduced augmentation intensity
-        - Less noise (0.3 -> 0.15mm)
-        - Less scaling variation
-        - More conservative rotations
-        """
-        # 1. Very small anatomical scaling (was 0.97-1.03)
+        # 1. Very small anatomical scaling
         scale = np.random.uniform(0.98, 1.02)
         pos = pos * scale
 
-        # 2. Small random rotation (was 0-2π, now much smaller)
-        # Only rotate around primary axis to maintain anatomical orientation
+        # 2. Small random rotation
         angle_range = np.pi / 12  # ±15 degrees
         angles = np.random.uniform(-angle_range, angle_range, size=3)
         cx, cy, cz = np.cos(angles)
         sx, sy, sz = np.sin(angles)
 
-        Rx = np.array([[1, 0, 0],
-                    [0, cx, -sx],
-                    [0, sx, cx]])
-        Ry = np.array([[cy, 0, sy],
-                    [0, 1, 0],
-                    [-sy, 0, cy]])
-        Rz = np.array([[cz, -sz, 0],
-                    [sz, cz, 0],
-                    [0, 0, 1]])
+        Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+        Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+        Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
 
         R = Rz @ Ry @ Rx
         pos = pos @ R.T
 
-        # 3. CRITICAL: Reduced noise (was 0.3, now 0.15mm)
-        # This is the key fix - training data should match test data better
+        # 3. Reduced noise
         noise = np.random.normal(0, 0.15, pos.shape)
         pos = pos + noise
 
@@ -110,25 +96,56 @@ class LoadFemurDataset(Dataset):
             is_flipped = True
         
         side = 1 
-
-        # CRITICAL: Apply augmentation AFTER chirality correction
-        # This ensures augmented data maintains correct orientation
         if self.augment:
             coords = self.augment_samples(coords)
         
         pos = torch.tensor(coords, dtype=torch.float32)
 
+        # --- EDGE HANDLING ---
+        edge_index = self.edge_index.clone()
         if subject in self.edges_df.columns:
             dists = self.edges_df[subject].values.astype(float)
         else:
-            # Still use zeros if missing, but we've already warned
-            dists = np.zeros(self.edge_index.size(1))
+            dists = np.zeros(edge_index.size(1))
+        
+        # --- FIXED: DYNAMIC FORCE CONNECTIVITY ---
+        extra_edges = []
+        extra_dists = []
+        
+        # Check which nodes exist for this bone type (Indices < NUM_NODES)
+        # Femur has 12 nodes (valid: 10, 11). Tibia has 11 nodes (valid: 10 only).
+        target_nodes_to_connect = [n for n in [10, 11] if n < config.NUM_NODES]
+        
+        for target_node in target_nodes_to_connect: 
+            for anchor in config.KNOWN_IDS:
+                # Skip self-loops if target is an anchor
+                if target_node == anchor:
+                    continue
+
+                # Add edge: target -> anchor
+                extra_edges.append([target_node, anchor])
+                d = np.linalg.norm(coords[target_node] - coords[anchor])
+                extra_dists.append(d)
+                
+                # Add edge: anchor -> target
+                extra_edges.append([anchor, target_node])
+                d = np.linalg.norm(coords[anchor] - coords[target_node])
+                extra_dists.append(d)
+
+        if extra_edges:
+            extra_edge_index = torch.tensor(extra_edges, dtype=torch.long).T
+            extra_edge_attr = torch.tensor(extra_dists, dtype=torch.float32)
+            
+            # Combine
+            edge_index = torch.cat([edge_index, extra_edge_index], dim=1)
+            dists = np.concatenate([dists, extra_edge_attr.numpy()])
 
         edge_attr = torch.tensor(dists, dtype=torch.float32).unsqueeze(-1)
+        # -----------------------------
 
         data = Data(
             pos=pos,
-            edge_index=self.edge_index.clone(),
+            edge_index=edge_index,
             edge_attr=edge_attr,
             known_mask=torch.tensor(get_known_mask(), dtype=torch.bool),
             side=torch.tensor(side, dtype=torch.long),
@@ -138,6 +155,7 @@ class LoadFemurDataset(Dataset):
         )
         return data
 
+# (get_dataloaders function remains the same)
 def get_dataloaders(landmarks_csv, edges_csv, batch_size, split=[0.8, 0.1, 0.1]):
     full_dataset = LoadFemurDataset(landmarks_csv, edges_csv, augment=False)
     total_size = len(full_dataset)
@@ -147,7 +165,7 @@ def get_dataloaders(landmarks_csv, edges_csv, batch_size, split=[0.8, 0.1, 0.1])
 
     train_subset, val_subset, test_subset = random_split(
         full_dataset, [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(42)
+        generator=torch.Generator().manual_seed(16)
     )
 
     train_data = LoadFemurDataset(landmarks_csv, edges_csv, augment=True) 
