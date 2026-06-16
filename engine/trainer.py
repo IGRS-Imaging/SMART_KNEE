@@ -45,7 +45,7 @@ def train_engine(train_loader, val_loader, args):
         mode='min', 
         factor=0.5, 
         patience=20,
-        verbose=True,
+        # verbose=True,
         min_lr=1e-6
     )
     

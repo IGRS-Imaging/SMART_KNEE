@@ -53,4 +53,6 @@ node_modules/
 environment-cpu.yml
 checkpoints/
 data/csv/
+/ablation
+outputs
 

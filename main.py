@@ -10,6 +10,7 @@ from data.dataset import get_dataloaders
 from engine.trainer import train_engine
 from engine.evaluator import evaluate_model
 from models import LandmarkCompletionModel
+from utils.calculate_mean_shape import calculate_mean_shape
 import warnings
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -21,8 +22,8 @@ def parse_args():
                         help='Bone type: femur or tibia')
 
     # Modes
-    parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'], 
-                        help='Mode: train or test')
+    parser.add_argument('--mode', type=str, default='train', choices=['train', 'test', 'mean_shape'], 
+                        help='Mode: train, test or mean_shape')
     
     # Paths (Override config if provided)
     parser.add_argument('--csv_path', type=str, default=None, help='Override path to landmarks CSV')
@@ -194,6 +195,11 @@ def main():
     
     # 1. SETUP CONFIGURATION
     config.set_bone_config(args.bone)
+
+    if args.mode == 'mean_shape':
+        print(f"Generating mean shape for {args.bone}..")
+        calculate_mean_shape(args.bone)
+        return
     
     if args.csv_path: config.LANDMARKS_CSV = args.csv_path
     if args.edges_path: config.EDGES_CSV = args.edges_path
@@ -240,11 +246,11 @@ def main():
             # This generates both predictions.csv AND edges_predictions.csv
             
             # Save Test Set
-            test_out = os.path.join(os.path.dirname(config.CHECKPOINT_PATH), f"pred_test_{args.bone}.csv")
+            test_out = os.path.join(config.PRED_OUTPUT_DIR, f"pred_test_{args.bone}.csv")
             save_predictions_to_csv(model, test_loader, device, test_out, args.bone)
             
             # Save Train Set
-            train_out = os.path.join(os.path.dirname(config.CHECKPOINT_PATH), f"pred_train_{args.bone}.csv")
+            train_out = os.path.join(config.PRED_OUTPUT_DIR, f"pred_train_{args.bone}.csv")
             save_predictions_to_csv(model, train_loader, device, train_out, args.bone)
 
 if __name__ == "__main__":

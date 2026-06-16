@@ -21,7 +21,7 @@ W_ANGLE = 0.8
 FEMUR_CONFIG = {
     "NUM_NODES": 12,
     "KNOWN_IDS": [0, 1, 2, 3],
-    "MEAN_SHAPE_FILENAME": "mean_canonical_shape.npy",
+    "MEAN_SHAPE_FILENAME": "mean_canonical_shape_femur.npy",
     "LANDMARKS_FILENAME": "FEMUR_LANDMARKS.csv",
     "EDGES_FILENAME": "Femur_Edges.csv",
     "CHECKPOINT_FILENAME": "best_model_femur.pt",
@@ -35,7 +35,7 @@ TIBIA_CONFIG = {
     "LANDMARKS_FILENAME": "batchreplace_lm.csv",
     "EDGES_FILENAME": "batchreplace_edges.csv",
     "CHECKPOINT_FILENAME": "best_model_tibia.pt",
-    "NODE_IMPORTANCE": {} # Add specific weights for Tibia if needed
+    "NODE_IMPORTANCE": {} 
 }
 
 # ================= DEFAULTS (Placeholders) =================
@@ -49,18 +49,19 @@ CHECKPOINT_PATH = ""
 TEST_MODEL_PATH = ""
 LOG_PATH = ""
 NODE_IMPORTANCE = {}
+PRED_OUTPUT_DIR = ""
 
 def set_bone_config(bone_type):
     """
     Updates the global variables in this module based on the bone type.
     """
     global NUM_NODES, KNOWN_IDS, MEAN_SHAPE_PATH, LANDMARKS_CSV
-    global EDGES_CSV, CHECKPOINT_PATH, TEST_MODEL_PATH, LOG_PATH, NODE_IMPORTANCE
+    global EDGES_CSV, CHECKPOINT_PATH, TEST_MODEL_PATH, LOG_PATH, NODE_IMPORTANCE, PRED_OUTPUT_DIR
 
     if bone_type.lower() == 'tibia':
         cfg = TIBIA_CONFIG
     else:
-        cfg = FEMUR_CONFIG # Default to Femur
+        cfg = FEMUR_CONFIG
 
     print(f"⚙️  Loading Configuration for: {bone_type.upper()}")
 
@@ -69,14 +70,22 @@ def set_bone_config(bone_type):
     KNOWN_IDS = cfg["KNOWN_IDS"]
     NODE_IMPORTANCE = cfg["NODE_IMPORTANCE"]
 
-    # 2. Update Paths
-    MEAN_SHAPE_PATH = os.path.join(PROJECT_ROOT, "data", cfg["MEAN_SHAPE_FILENAME"])
+    # 2. Define folder paths
+    outputs_dir = os.path.join(PROJECT_ROOT, "outputs")
+    checkpoints_dir = os.path.join(PROJECT_ROOT, "checkpoints")
+
+    # 3. Create outputs folder if it doesn't exist
+    os.makedirs(outputs_dir, exist_ok=True)
+
+    # 4. Update Paths
+    MEAN_SHAPE_PATH = os.path.join(checkpoints_dir, cfg["MEAN_SHAPE_FILENAME"])  # checkpoints/
     LANDMARKS_CSV = os.path.join(PROJECT_ROOT, "data", cfg["LANDMARKS_FILENAME"])
     EDGES_CSV = os.path.join(PROJECT_ROOT, "data", cfg["EDGES_FILENAME"])
-    
-    CHECKPOINT_PATH = os.path.join(PROJECT_ROOT, "checkpoints", cfg["CHECKPOINT_FILENAME"])
-    TEST_MODEL_PATH = CHECKPOINT_PATH
-    LOG_PATH = os.path.join(PROJECT_ROOT, "checkpoints", f"training_log_{bone_type}.csv")
 
-# Set default immediately so imports don't crash before main() runs
+    CHECKPOINT_PATH = os.path.join(checkpoints_dir, cfg["CHECKPOINT_FILENAME"])
+    TEST_MODEL_PATH = CHECKPOINT_PATH
+    LOG_PATH = os.path.join(outputs_dir, f"training_log_{bone_type}.csv")   # outputs/
+    PRED_OUTPUT_DIR = outputs_dir                                             # outputs/
+
+# Set default
 set_bone_config('femur')

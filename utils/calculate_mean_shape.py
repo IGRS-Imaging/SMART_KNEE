@@ -13,7 +13,8 @@ def extract_coords(row):
     coords = coords.reshape(config.NUM_NODES, 3)
     return coords
 
-def calculate_mean_shape():
+def calculate_mean_shape(bone_type= 'femur'):
+    config.set_bone_config(bone_type)
     print(f"Calculating Mean Canonical Shape from: {config.LANDMARKS_CSV}")
     
     df = pd.read_csv(config.LANDMARKS_CSV, skiprows=[1])
@@ -52,4 +53,5 @@ def calculate_mean_shape():
     print(f"   Based on {count_used} samples (Right side only).")
 
 if __name__ == "__main__":
-    calculate_mean_shape()
+    bone_type = sys.argv[1] if len(sys.argv) > 1 else 'femur'
+    calculate_mean_shape(bone_type)
