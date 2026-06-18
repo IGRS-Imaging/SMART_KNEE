@@ -74,8 +74,6 @@ python main.py --bone femur --mode test
 python main.py --bone tibia --mode test
 ```
 ---
-
-##<img width="970" height="407" alt="results-finial methodology drawio" src="https://github.com/user-attachments/assets/0ebf0799-7df0-4775-827d-7e17b2bea914" />
  Saving Results as CSV
 
 To save inference results in CSV format:
