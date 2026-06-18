@@ -1,4 +1,4 @@
-# BONE_SYNTHESIS_MICCAI_2026
+# SMART-KNEE: Sparse-Morphology based Anatomical Reconstruction using Topology-Aware Networks for Imageless Total Knee Arthroplasty
 
 A framework for femur and tibia bone synthesis, training, testing, and CSV-based result export.
 
