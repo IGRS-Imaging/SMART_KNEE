@@ -6,7 +6,8 @@ set from four sparse intraoperative anchors, where graph-centrality-based anchor
 selection proves critical to localisation accuracy. 
 An Anatomy-Aware GAN then fuses the predicted landmarks with a sparse surface point cloud to reconstruct
 complete, patient-specific Femur and Tibia morphology. 
-<img width="970" height="407" alt="results-finial methodology drawio" src="https://github.com/user-attachments/assets/28a91ea9-4603-418e-ab46-8c7f47088184" />
+<img width="970" height="407" alt="results-finial methodology drawio (1)" src="https://github.com/user-attachments/assets/9e0c5f65-9064-407d-8f55-6a441c1cd61a" />
+
 
 
 ## Repository
