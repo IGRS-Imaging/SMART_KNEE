@@ -1,6 +1,11 @@
 # SMART-KNEE: Sparse-Morphology based Anatomical Reconstruction using Topology-Aware Networks for Imageless Total Knee Arthroplasty
 
-A framework for femur and tibia bone synthesis, training, testing, and CSV-based result export.
+SMART-KNEE presents a two-stage cascaded framework for knee reconstruction in ITKA.
+A Topology-Aware EGNN first completes the full anatomical landmark
+set from four sparse intraoperative anchors, where graph-centrality-based anchor
+selection proves critical to localisation accuracy. 
+An Anatomy-Aware GAN then fuses the predicted landmarks with a sparse surface point cloud to reconstruct
+complete, patient-specific Femur and Tibia morphology. 
 
 ## Repository
 
