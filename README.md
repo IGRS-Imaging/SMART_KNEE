@@ -6,6 +6,8 @@ set from four sparse intraoperative anchors, where graph-centrality-based anchor
 selection proves critical to localisation accuracy. 
 An Anatomy-Aware GAN then fuses the predicted landmarks with a sparse surface point cloud to reconstruct
 complete, patient-specific Femur and Tibia morphology. 
+![Uploading results-finial methodology.drawio.svg…]()
+
 
 ## Repository
 
@@ -13,7 +15,7 @@ https://github.com/IGRS-medical-imaging/BONE_SYNTHESIS_MICCAI_2026.git
 
 ---
 
-# Installation
+## Installation
 
 Clone the repository:
 
@@ -30,7 +32,7 @@ conda env create -f environment.yml
 
 ---
 
-# Dataset Preparation
+## Dataset Preparation
 
 Before training or testing, calculate the mean shape for the target bone.
 
@@ -41,16 +43,13 @@ Before training or testing, calculate the mean shape for the target bone.
 ```bash
 python util/calculate_mean_shape.py femur
 ```
-
 ### Tibia
 
 ```bash
 python util/calculate_mean_shape.py tibia
 ```
-
 ---
-
-# Training
+## Training
 
 ## Femur Model
 
@@ -66,23 +65,19 @@ python main.py --bone tibia --mode train
 
 ---
 
-# Evaluation
-
+## Evaluation
 ## Test Femur Model
-
 ```bash
 python main.py --bone femur --mode test
-```
-
+``` 
 ## Test Tibia Model
-
 ```bash
 python main.py --bone tibia --mode test
 ```
-
 ---
 
-# Saving Results as CSV
+##<img width="970" height="407" alt="results-finial methodology drawio" src="https://github.com/user-attachments/assets/0ebf0799-7df0-4775-827d-7e17b2bea914" />
+ Saving Results as CSV
 
 To save inference results in CSV format:
 
