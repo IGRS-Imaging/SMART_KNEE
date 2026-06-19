@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Georgia&size=40&duration=1&pause=1000&color=000000&center=true&vCenter=true&repeat=false&width=750&height=60&lines=Sparse-Morphology+based+Anatomical+Reconstruction+using+Topology-Aware+Networks" alt="subtitle line 1" />
+  <img src="https://readme-typing-svg.demolab.com?font=Georgia&size=40&duration=1&pause=1000&color=000000&center=true&vCenter=true&repeat=false&width=750&height=60&lines=Sparse-Morphology+based+Anatomical+Reconstruction+using+Topology Aware+Networks" alt="subtitle line 1" />
   <br>
   <img src="https://readme-typing-svg.demolab.com?font=Georgia&size=40&duration=1&pause=1000&color=000000&center=true&vCenter=true&repeat=false&width=600&height=50&lines=for+Imageless+Total+Knee+Arthroplasty" alt="subtitle line 2" />
 </p>
