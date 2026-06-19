@@ -1,4 +1,4 @@
-<h1 align="center">#SMART-KNEE</h1>
+<h0.75 align="center">SMART-KNEE</h0.75>
 <h2 align="center">Sparse-Morphology based Anatomical Reconstruction using Topology-Aware Networks for Imageless Total Knee Arthroplasty</h2>
 
 <p align="center">
