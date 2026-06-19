@@ -23,7 +23,6 @@ A two-stage, cascaded deep learning framework that reconstructs patient-specific
   <br>
 <sub>Patient-specific bone geometry reconstruction using Topology-Aware EGNN and Anatomy-Aware GAN</sub>
 </p>
----
 
 
 ## Overview
