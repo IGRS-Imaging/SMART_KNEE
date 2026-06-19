@@ -73,8 +73,8 @@ At inference, the output point cloud is rescaled to millimetre space and convert
 ## RESULTS 
 ### Landmark localisation (per-bone mean error, mm)
 
-| Bone  | **SMART-KNEE (Ours)** |
-|---|---|---|---|
+| Bone | SMART-KNEE (Ours) |
+|------|-------------------|
 | Femur | **1.25 ± 0.75** |
 | Tibia | **1.69 ± 0.09** |
 
