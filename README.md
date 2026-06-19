@@ -19,10 +19,6 @@ A two-stage, cascaded deep learning framework that reconstructs patient-specific
 </p>
 
 <p align="center">
-  <i>Landmark localisation error: 2.28 ± 1.68 mm (Femur), 1.65 ± 0.83 mm (Tibia) — both within the 3 mm clinically accepted ITKA threshold.</i>
-</p>
-
-<p align="center">
   <img width="970" height="407" alt="results-finial methodology drawio (1)" src="https://github.com/user-attachments/assets/faa7757d-806c-49ed-a441-f19eadd4d3ef" />
   <br>
   <sub>Fig. 1 — Intraoperative anchor landmarks are completed by the Topology-Aware EGNN, then fused with a sparse surface point cloud by the Anatomy-Aware GAN to reconstruct complete, patient-specific bone geometry.</sub>
