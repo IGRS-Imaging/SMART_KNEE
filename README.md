@@ -23,28 +23,7 @@ A two-stage, cascaded deep learning framework that reconstructs patient-specific
   <br>
 <sub>Patient-specific bone geometry reconstruction using Topology-Aware EGNN and Anatomy-Aware GAN</sub>
 </p>
-
 ---
-
-## Table of Contents
-- [Overview](#overview)
-- [Highlights](#highlights)
-- [Method](#method)
-  - [Stage 1 — Topology-Aware EGNN](#stage-1--topology-aware-egnn-landmark-completion)
-  - [Stage 2 — Anatomy-Aware GAN](#stage-2--anatomy-aware-gan-surface-reconstruction)
-- [Results](#results)
-- [Dataset](#dataset)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Limitations & Future Work](#limitations--future-work)
-- [Citation](#citation)
-- [Acknowledgments](#acknowledgments)
-- [License](#license)
-
----
-
 ## Overview
 Imageless Total Knee Arthroplasty (ITKA) plans implant positioning in real time from sparse, intraoperatively digitised anatomical landmarks, avoiding the cost and radiation exposure of CT/MRI-based workflows. The catch is that sparse-landmark reconstruction has historically relied on statistical shape models and parametric assumptions, which cap how much patient-specific anatomical detail can be recovered — leading to inaccurate axis alignment, suboptimal implant sizing, and soft-tissue imbalance.
 
