@@ -54,12 +54,8 @@ Imageless Total Knee Arthroplasty (ITKA) plans implant positioning in real time 
 
 The result is a fully imageless pipeline that produces patient-specific bone morphology accurate enough for intraoperative ITKA planning.
 
-## Highlights
-- **No preoperative imaging required** — the full pipeline runs from intraoperative landmarks and a sparse probe-acquired point cloud only.
-- **E(3)-equivariant landmark completion** — robust to how the patient/probe is oriented in the operating theatre.
-- **Up to 6× more accurate landmark localisation** than comparable equivariant GNN baselines (VN-EGNN, EquiPPIS).
-- **Clinically validated on a 3D-printed, CT-derived phantom** under optical tracking, in addition to a held-out digital test cohort.
-- **361 annotated femur + tibia models** with a 12-landmark (femur) / 11-landmark (tibia) anatomical schema, derived from a publicly available lower-limb CT dataset.
+## DATASET
+The dataset provides patient-specific 3D bone STL models for the femur (360 specimens) and tibia (396 specimens), curated to support research in ITKA. Each bone model is accompanied by an Excel file containing the complete set of anatomical landmarks (11 per femur, 10 per tibia) required for accurate bone morphological reconstruction and anatomical axis alignment. All landmarks were manually annotated and subsequently validated by clinical experts to ensure anatomical accuracy and consistency across the dataset. This resource is intended to support the development and benchmarking of landmark prediction, statistical shape modelling, and generative reconstruction methods for knee arthroplasty research.
 
 ## Method
 <p align="center">
