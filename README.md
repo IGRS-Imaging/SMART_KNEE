@@ -31,13 +31,11 @@ Imageless Total Knee Arthroplasty (ITKA) plans implant positioning in real time 
 **SMART-KNEE** closes that gap with a cascaded pipeline:
 1. A **Topology-Aware Equivariant Graph Neural Network (EGNN)** predicts the complete anatomical landmark set from just 4 intraoperative anchor landmarks per bone, enforcing E(3)-equivariance (rotation / translation / reflection invariance) and anatomical plausibility.
 2. An **Anatomy-Aware GAN** fuses those predicted landmarks with a sparse intraoperative surface point cloud to reconstruct complete, watertight, patient-specific femur and tibia surfaces.
-
-The result is a fully imageless pipeline that produces patient-specific bone morphology accurate enough for intraoperative ITKA planning.
-
+   
 ## DATASET
 The dataset provides patient-specific 3D bone STL models for the femur (360 specimens) and tibia (396 specimens), curated to support research in ITKA. Each bone model is accompanied by an Excel file containing the complete set of anatomical landmarks (11 per femur, 10 per tibia) required for accurate bone morphological reconstruction and anatomical axis alignment. All landmarks were manually annotated and subsequently validated by clinical experts to ensure anatomical accuracy and consistency across the dataset. This resource is intended to support the development and benchmarking of landmark prediction, statistical shape modelling, and generative reconstruction methods for knee arthroplasty research.
 
-## Method
+## METHODS
 <p align="center">
   <img width="785" height="284" alt="results-EGNN_FINAL drawio" src="https://github.com/user-attachments/assets/ab0e82eb-c2d5-49ac-b258-2cbde8fb20a8" />
 
@@ -70,19 +68,15 @@ Training happens in two phases:
 
 1. **Autoencoder pretraining** — a PointNet autoencoder learns a structured latent geometry manifold from complete knee surfaces, optimised with symmetric Chamfer Distance. Weights are frozen after this phase.
 2. **Conditional adversarial training** — a generator fuses a Patch Encoder (local surface topology from the partial point cloud) with a Landmark Encoder (patient-specific proportions from the Stage 1 predictions) into a single latent code, decoded by the frozen decoder into a complete point cloud. A lightweight latent-space discriminator drives the generator's output onto the pretrained geometry manifold under an LS-GAN objective, jointly supervised by adversarial realism, patch coverage, and landmark fidelity losses.
-
 At inference, the output point cloud is rescaled to millimetre space and converted into a watertight mesh via Poisson surface reconstruction.
 
-## Results
-
+## RESULTS 
 ### Landmark localisation (per-bone mean error, mm)
 
-| Bone | VN-EGNN | E(3)-EGNN | **SMART-KNEE (Ours)** |
+| Bone  | **SMART-KNEE (Ours)** |
 |---|---|---|---|
-| Femur | 7.50 | 7.91 | **1.25 ± 0.75** |
-| Tibia | 7.81 | 12.12 | **1.69 ± 0.09** |
-
-> Full per-node breakdown (12 femoral / 11 tibial landmarks) is in Table 2 of the paper. Largest gains appear at landmarks farthest from the known anchors — exactly where topology-aware equivariant message passing matters most.
+| Femur | **1.25 ± 0.75** |
+| Tibia | **1.69 ± 0.09** |
 
 ### Surface reconstruction quality (39 held-out test subjects)
 
