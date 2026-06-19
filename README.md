@@ -1,4 +1,7 @@
-<h1 align="center">SMART-KNEE</h1>
+<!-- <h1 align="center">SMART-KNEE</h1> -->
+<p align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Georgia&size=72&duration=1&pause=1000&color=000000&center=true&vCenter=true&repeat=false&width=600&height=100&lines=SMART-KNEE" alt="SMART-KNEE" />
+</p>
 <h2 align="center">Sparse-Morphology based Anatomical Reconstruction using Topology-Aware Networks for Imageless Total Knee Arthroplasty</h2>
 
 <p align="center">
