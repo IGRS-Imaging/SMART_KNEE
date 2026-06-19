@@ -25,7 +25,7 @@ A two-stage, cascaded deep learning framework that reconstructs patient-specific
 </p>
 
 
-## Overview
+## OVERVIEW
 Imageless Total Knee Arthroplasty (ITKA) plans implant positioning in real time from sparse, intraoperatively digitised anatomical landmarks, avoiding the cost and radiation exposure of CT/MRI-based workflows. The catch is that sparse-landmark reconstruction has historically relied on statistical shape models and parametric assumptions, which cap how much patient-specific anatomical detail can be recovered — leading to inaccurate axis alignment, suboptimal implant sizing, and soft-tissue imbalance.
 
 **SMART-KNEE** closes that gap with a cascaded pipeline:
