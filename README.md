@@ -14,9 +14,9 @@
   <img alt="Status" src="https://img.shields.io/badge/status-research-orange">
 </p>
 
-<p align="center">
+<!-- <p align="center">
 A two-stage, cascaded deep learning framework that reconstructs patient-specific femur and tibia morphology from a sparse set of intraoperative landmarks and a partial surface point cloud — <b>without any preoperative imaging</b>.
-</p>
+</p> -->
 
 <p align="center">
   <img width="970" height="407" alt="results-finial methodology drawio (1)" src="https://github.com/user-attachments/assets/faa7757d-806c-49ed-a441-f19eadd4d3ef" />
