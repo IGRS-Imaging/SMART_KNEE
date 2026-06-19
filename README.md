@@ -21,7 +21,7 @@ A two-stage, cascaded deep learning framework that reconstructs patient-specific
 <p align="center">
   <img width="970" height="407" alt="results-finial methodology drawio (1)" src="https://github.com/user-attachments/assets/faa7757d-806c-49ed-a441-f19eadd4d3ef" />
   <br>
-<sub>Patient-specific bone geometry reconstruction using Topology-Aware EGNN and Anatomy-Aware GAN.</sub>
+<sub>Patient-specific bone geometry reconstruction using Topology-Aware EGNN and Anatomy-Aware GAN</sub>
 </p>
 
 ---
@@ -46,18 +46,15 @@ A two-stage, cascaded deep learning framework that reconstructs patient-specific
 ---
 
 ## Overview
-
 Imageless Total Knee Arthroplasty (ITKA) plans implant positioning in real time from sparse, intraoperatively digitised anatomical landmarks, avoiding the cost and radiation exposure of CT/MRI-based workflows. The catch is that sparse-landmark reconstruction has historically relied on statistical shape models and parametric assumptions, which cap how much patient-specific anatomical detail can be recovered — leading to inaccurate axis alignment, suboptimal implant sizing, and soft-tissue imbalance.
 
 **SMART-KNEE** closes that gap with a cascaded pipeline:
-
 1. A **Topology-Aware Equivariant Graph Neural Network (EGNN)** predicts the complete anatomical landmark set from just 4 intraoperative anchor landmarks per bone, enforcing E(3)-equivariance (rotation / translation / reflection invariance) and anatomical plausibility.
 2. An **Anatomy-Aware GAN** fuses those predicted landmarks with a sparse intraoperative surface point cloud to reconstruct complete, watertight, patient-specific femur and tibia surfaces.
 
 The result is a fully imageless pipeline that produces patient-specific bone morphology accurate enough for intraoperative ITKA planning.
 
 ## Highlights
-
 - **No preoperative imaging required** — the full pipeline runs from intraoperative landmarks and a sparse probe-acquired point cloud only.
 - **E(3)-equivariant landmark completion** — robust to how the patient/probe is oriented in the operating theatre.
 - **Up to 6× more accurate landmark localisation** than comparable equivariant GNN baselines (VN-EGNN, EquiPPIS).
@@ -65,7 +62,6 @@ The result is a fully imageless pipeline that produces patient-specific bone mor
 - **361 annotated femur + tibia models** with a 12-landmark (femur) / 11-landmark (tibia) anatomical schema, derived from a publicly available lower-limb CT dataset.
 
 ## Method
-
 <p align="center">
   <img width="785" height="284" alt="results-EGNN_FINAL drawio" src="https://github.com/user-attachments/assets/ab0e82eb-c2d5-49ac-b258-2cbde8fb20a8" />
 
