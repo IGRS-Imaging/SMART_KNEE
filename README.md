@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-A two-stage, cascaded deep learning framework that reconstructs patient-specific femur and tibia morphology from a sparse set of intraoperative landmarks and a partial surface point cloud — <b>without any preoperative CT or MRI</b>.
+A two-stage, cascaded deep learning framework that reconstructs patient-specific femur and tibia morphology from a sparse set of intraoperative landmarks and a partial surface point cloud — <b>without any preoperative imaging</b>.
 </p>
 
 <p align="center">
