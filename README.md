@@ -256,7 +256,7 @@ python main.py --bone tibia --mode test --save_csv
 If you use SMART-KNEE in your research, please cite:
 
 ```bibtex
-@inproceedings{rajasekar2026smartknee,
+@inproceedings{SmartKnee,
   title     = {SMART-KNEE: Sparse-Morphology based Anatomical Reconstruction using
                Topology-Aware Networks for Imageless Total Knee Arthroplasty},
   author    = {Durga Rajasekar Swetha Lakshmi S,Vishnu M R,
