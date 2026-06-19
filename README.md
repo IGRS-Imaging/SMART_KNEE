@@ -64,7 +64,8 @@ The result is a fully imageless pipeline that produces patient-specific bone mor
 ## Method
 
 <p align="center">
-  <img src="assets/egnn_architecture.png" alt="Topology-Aware EGNN architecture" width="750">
+  <img width="785" height="284" alt="results-EGNN_FINAL drawio" src="https://github.com/user-attachments/assets/ab0e82eb-c2d5-49ac-b258-2cbde8fb20a8" />
+
   <br>
   <sub>Fig. 2 — Topology-Aware EGNN mapping sparse known anchors (red) to the complete predicted landmark set (green).</sub>
 </p>
