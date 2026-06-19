@@ -85,7 +85,8 @@ Anchor selection matters: distally clustered anchors (e.g. nodes {3,4,5,6}) push
 ### Stage 2 — Anatomy-Aware GAN (Surface Reconstruction)
 
 <p align="center">
-  <img src="assets/gan_architecture.png" alt="Anatomy-Aware GAN architecture" width="750">
+  <img width="643" height="501" alt="results-finial_GAN drawio" src="https://github.com/user-attachments/assets/2cb7e4da-0789-4779-91ac-7e5ee46265c1" />
+
   <br>
   <sub>Fig. 3 — Anatomy-Aware GAN for patient-specific femur and tibia surface reconstruction.</sub>
 </p>
