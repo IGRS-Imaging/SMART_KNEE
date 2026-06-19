@@ -259,8 +259,8 @@ If you use SMART-KNEE in your research, please cite:
 @inproceedings{rajasekar2026smartknee,
   title     = {SMART-KNEE: Sparse-Morphology based Anatomical Reconstruction using
                Topology-Aware Networks for Imageless Total Knee Arthroplasty},
-  author    = {Rajasekar, Durga and Lakshmi S, Swetha and M R, Vishnu and
-               Maik, Vivek and Lakshmanan, Manojkumar and Sivaprakasam, Mohanasankar},
+  author    = {Durga Rajasekar Swetha Lakshmi S,Vishnu M R,
+  Vivek Maik, Manojkumar Lakshmanan,Mohanasankar Sivaprakasam},
   booktitle = {TBD},
   year      = {2026}
 }
