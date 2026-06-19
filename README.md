@@ -1,5 +1,5 @@
 <h1 align="center">SMART-KNEE</h1>
-<h3 align="center">Sparse-Morphology based Anatomical Reconstruction using Topology-Aware Networks for Imageless Total Knee Arthroplasty</h3>
+<h2 align="center">Sparse-Morphology based Anatomical Reconstruction using Topology-Aware Networks for Imageless Total Knee Arthroplasty</h2>
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/python-3.9%2B-blue">
