@@ -213,7 +213,6 @@ python main.py --bone tibia --mode test --save_csv
 - Validation to date covers a held-out digital test cohort and a single 3D-printed, CT-derived phantom under optical tracking. Cadaveric specimens and live intraoperative, patient-specific TKA settings are the natural next step and are planned as future work.
 - Reconstruction quality (particularly femoral HD95) is currently bounded more by intraoperative surface acquisition coverage than by the generative architecture itself — wider articular surface sampling is expected to narrow this further.
 
-## Citation
 
 If you use SMART-KNEE in your research, please cite:
 
